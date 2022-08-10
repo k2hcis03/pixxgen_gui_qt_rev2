@@ -4,6 +4,7 @@ import fcntl
 import user_ioctl
 # import user_thread
 import ctypes
+import define
 
 STEP_MOTOR = 1
 DC_MOTOR = 2
@@ -35,15 +36,15 @@ class GPIORead:
                 elif motor_number == 4:
                     motor_dir = self.st_motor.motor4_dir
                 
-                if motor_dir == self.st_motor.CW:
+                if motor_dir == define.CW:
                     self.st_motor.st_motor_start(motor_number, False, 0, 0) 
             else:
                 if motor_number == 1:
                     motor_dir = self.dc_motor.motor1_dir
                 elif motor_number == 2:
                     motor_dir = self.dc_motor.motor2_dir
-                if motor_dir == self.dc_motor.CW:
-                    self.dc_motor.dc_motor_start(motor_number, False, 1, self.dc_motor.CW, 0)
+                if motor_dir == define.CW:
+                    self.dc_motor.dc_motor_start(motor_number, False, 1, define.CW, 0)
 
             self.gpio_i2c_parsing_data[encoder_name][2] = 1     # 검출 플래그 설정
 
@@ -70,39 +71,6 @@ class GPIORead:
                 # self.logging.info('DC모터 좌측 센서 비 검출')
                 pass
 
-    # def motor_limit_middle_switch_detect(self, motor_type, motor_number, encoder_name):
-    #     if (self.gpio_i2c_parsing_data[encoder_name][1] == 'active_high' and self.gpio_i2c_parsing_data[encoder_name][
-    #         0] == 1) or \
-    #             (self.gpio_i2c_parsing_data[encoder_name][1] == 'active_low' and
-    #              self.gpio_i2c_parsing_data[encoder_name][0] == 0):
-    #         if motor_type == STEP_MOTOR:
-    #             if motor_number == 1:
-    #                 motor_dir = self.st_motor.motor1_dir
-    #             elif motor_number == 2:
-    #                 motor_dir = self.st_motor.motor2_dir
-    #             elif motor_number == 3:
-    #                 motor_dir = self.st_motor.motor3_dir
-    #             elif motor_number == 4:
-    #                 motor_dir = self.st_motor.motor4_dir
-    #
-    #         else:
-    #             if motor_number == 1:
-    #                 motor_dir = self.dc_motor.motor1_dir
-    #             elif motor_number == 2:
-    #                 motor_dir = self.dc_motor.motor2_dir
-    #         self.gpio_i2c_parsing_data[encoder_name][2] = 1
-    #
-    #         if motor_type == STEP_MOTOR:
-    #             self.builder.get_object("motor{}_toggle_middlelimit".format(motor_number)).set_active(1)
-    #         else:
-    #             self.builder.get_object("motor{}_toggle_middlelimit1".format(motor_number)).set_active(1)
-    #     else:
-    #         self.gpio_i2c_parsing_data[encoder_name][2] = 0
-    #         if motor_type == STEP_MOTOR:
-    #             self.builder.get_object("motor{}_toggle_middlelimit".format(motor_number)).set_active(0)
-    #         else:
-    #             self.builder.get_object("motor{}_toggle_middlelimit1".format(motor_number)).set_active(0)
-
     def motor_limit_right_switch_detect(self, motor_type, motor_number, encoder_name):
         if (self.gpio_i2c_parsing_data[encoder_name][1] == 'active_high' and self.gpio_i2c_parsing_data[encoder_name][0] == 1) or \
             (self.gpio_i2c_parsing_data[encoder_name][1] == 'active_low' and self.gpio_i2c_parsing_data[encoder_name][0] == 0):
@@ -115,7 +83,7 @@ class GPIORead:
                     motor_dir = self.st_motor.motor3_dir
                 elif motor_number == 4:
                     motor_dir = self.st_motor.motor4_dir
-                if motor_dir == self.st_motor.CCW:
+                if motor_dir == define.CCW:
                     self.st_motor.st_motor_start(motor_number, False, 0, 0)   
             else:
                 if motor_number == 1:
@@ -123,8 +91,8 @@ class GPIORead:
                 elif motor_number == 2:
                     motor_dir = self.dc_motor.motor2_dir
                     
-                if motor_dir == self.dc_motor.CCW:
-                    self.dc_motor.dc_motor_start(motor_number, False, 1, self.dc_motor.CCW, 0)  
+                if motor_dir == define.CCW:
+                    self.dc_motor.dc_motor_start(motor_number, False, 1, define.CCW, 0)  
                     
             self.gpio_i2c_parsing_data[encoder_name][2] = 1     # 검출 플래그 설정
 

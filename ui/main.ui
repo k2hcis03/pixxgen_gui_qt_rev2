@@ -387,7 +387,7 @@ QPushButton:pressed{
      <bool>false</bool>
     </property>
    </widget>
-   <widget class="QPushButton" name="pushButton_movi_left">
+   <widget class="QPushButton" name="pushButton_move_left">
     <property name="geometry">
      <rect>
       <x>773</x>

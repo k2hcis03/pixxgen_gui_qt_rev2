@@ -15,8 +15,11 @@ from stepping_motor import SteppingMotor as STMOTOR
 from dc_motor import DcMotor as DCMOTOR
 from collimator import Collimator as COLLMOTOR
 from uarts import Uarts as UARTS
+from concurrent.futures import ThreadPoolExecutor 
 import sensor_timer
-
+import threading
+import queue
+import position
 # from PySide6 import QtWidgets
 # from PySide6.QtWidgets import QApplication, QMainWindow, QLineEdit, QDialog, QMessageBox, QWidget, QFontDialog
 # from PySide6.QtGui import QPixmap, QIcon
@@ -45,6 +48,7 @@ class MainWindow(QMainWindow, ui):
         self.setupUi(self)
         
         self.toggle_laser = False       #레이저 다이오드 온 오프
+        self.command_queue = None
         
         # cc = Config("./config.ini")
         cc = Config("/home/pi/Projects/pixxgen_gui_qt/config.ini")      # For VSC
@@ -79,6 +83,19 @@ class MainWindow(QMainWindow, ui):
         else:
             logging.info('하드웨어 초기화 실패')
 
+        
+        # 모터 포시션 움직이는 쓰레드 생성
+        # with ThreadPoolExecutor(max_workers=1) as executor:
+        #     logging.info('MotorPosition thread is created')
+        #     command = queue.Queue(maxsize=10)
+        #     motor_poistion = position.MotorPosition(command, self.st_motor, self.init.gpio_i2c_parsing_data, logging)
+        #     executor.submit(motor_poistion.manager_motor_position)
+        
+        logging.info('MotorPosition thread is created')
+        self.command_queue = queue.Queue(maxsize=10)
+        motor_poistion = position.MotorPosition(self, self.command_queue, self.st_motor, self.init.gpio_i2c_parsing_data, logging)
+        motor_poistion.start()
+        
         self.pushButton_select_colimator.clicked.connect(self.chang_collimator)
 
         self.pushButton_motor_left.pressed.connect(lambda: self.move_motor_left_press(1))
@@ -95,6 +112,9 @@ class MainWindow(QMainWindow, ui):
 
         self.pushButton_laser.clicked.connect(self.on_off_laser)
         
+        self.pushButton_move_center.clicked.connect(self.move_center_position)
+        self.pushButton_move_left.clicked.connect(self.move_left_position)
+
     def chang_collimator(self):
         self.collimator_rotate += 1
         self.collimator_rotate %= 5
@@ -159,6 +179,8 @@ class MainWindow(QMainWindow, ui):
             self.st_motor.st_motor_start(3, False, 0, 0)
 
     def on_off_laser(self):
+        logging.info(f'pushButton_laser clicked : {self.toggle_laser}')
+        
         if self.toggle_laser:
             self.toggle_laser = not self.toggle_laser
             collimator_border = f'QPushButton{{border: none;}}'
@@ -169,11 +191,25 @@ class MainWindow(QMainWindow, ui):
             collimator_border = f'QPushButton{{border: none;}}'
             collimator_choice = f'QPushButton{{background-image: url(:/images/3_on.png)}}'
             self.pushButton_laser.setStyleSheet(collimator_border + collimator_choice)
+    
+    def move_center_position(self):
+        logging.info(f'pushButton_move_center clicked')
+    
+    def move_left_position(self):
+        logging.info(f'pushButton_move_left clicked')
+        message = {
+            'position'  : 'left',
+            'speed'     : 1000,
+            'count'     : 0, 
+            'timeout'   : 60*1000
+        }
+        self.command_queue.put(message)
         
 def main():
     app = QApplication(sys.argv)
     windows = MainWindow()
     windows.show()
+    
     try:
         sys.exit(app.exec())
     except KeyboardInterrupt:
