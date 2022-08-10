@@ -1,0 +1,680 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1024</width>
+    <height>600</height>
+   </rect>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>1024</width>
+    <height>600</height>
+   </size>
+  </property>
+  <property name="maximumSize">
+   <size>
+    <width>1024</width>
+    <height>600</height>
+   </size>
+  </property>
+  <property name="windowTitle">
+   <string>MainWindow</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true"/>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <property name="styleSheet">
+    <string notr="true">QWidget#centralwidget{
+background-image: url(:/images/0_background.png);}</string>
+   </property>
+   <widget class="QFrame" name="frame">
+    <property name="geometry">
+     <rect>
+      <x>0</x>
+      <y>0</y>
+      <width>1024</width>
+      <height>41</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">background-color: rgb(25, 75, 136);</string>
+    </property>
+    <property name="frameShape">
+     <enum>QFrame::StyledPanel</enum>
+    </property>
+    <property name="frameShadow">
+     <enum>QFrame::Raised</enum>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pushButton_total_body">
+    <property name="geometry">
+     <rect>
+      <x>62</x>
+      <y>219</y>
+      <width>119</width>
+      <height>104</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">QPushButton{
+	border:none;
+	background-image: url(:/images/b_total_body_norm.png);
+}
+
+QPushButton:pressed{
+	border:none;
+	background-image: url(:/images/b_total_body_down.png);
+}</string>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+    <property name="iconSize">
+     <size>
+      <width>119</width>
+      <height>104</height>
+     </size>
+    </property>
+    <property name="flat">
+     <bool>false</bool>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pushButton_lateral">
+    <property name="geometry">
+     <rect>
+      <x>191</x>
+      <y>219</y>
+      <width>119</width>
+      <height>104</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">QPushButton{
+	border:none;
+	background-image: url(:/images/b_lateral_norm.png);
+}
+
+QPushButton:pressed{
+	border:none;
+	background-image: url(:/images/b_lateral_down.png);
+}</string>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+    <property name="iconSize">
+     <size>
+      <width>119</width>
+      <height>104</height>
+     </size>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pushButton_va">
+    <property name="geometry">
+     <rect>
+      <x>320</x>
+      <y>219</y>
+      <width>119</width>
+      <height>104</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">QPushButton{
+	border:none;
+	background-image: url(:/images/b_va_norm.png);
+}
+
+QPushButton:pressed{
+	border:none;
+	background-image: url(:/images/b_va_down.png);
+}</string>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+    <property name="iconSize">
+     <size>
+      <width>119</width>
+      <height>104</height>
+     </size>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pushButton_mode">
+    <property name="geometry">
+     <rect>
+      <x>191</x>
+      <y>333</y>
+      <width>119</width>
+      <height>104</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">QPushButton{
+	border:none;
+	background-image: url(:/images/b_mode_norm.png);
+}
+
+QPushButton:pressed{
+	border:none;
+	background-image: url(:/images/b_mode_down.png);
+}</string>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+    <property name="iconSize">
+     <size>
+      <width>119</width>
+      <height>104</height>
+     </size>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pushButton_left_forearm">
+    <property name="geometry">
+     <rect>
+      <x>62</x>
+      <y>333</y>
+      <width>119</width>
+      <height>104</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">QPushButton{
+	border:none;
+	background-image: url(:/images/b_left_forearm_norm.png);
+}
+
+QPushButton:pressed{
+	border:none;
+	background-image: url(:/images/b_left_forearm_down.png);
+}</string>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+    <property name="iconSize">
+     <size>
+      <width>119</width>
+      <height>104</height>
+     </size>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pushButton_right_forearm">
+    <property name="geometry">
+     <rect>
+      <x>320</x>
+      <y>333</y>
+      <width>119</width>
+      <height>104</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">QPushButton{
+	border:none;
+	background-image: url(:/images/b_right_forearm_norm.png);
+}
+
+QPushButton:pressed{
+	border:none;
+	background-image: url(:/images/b_right_forearm_down.png);
+}</string>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+    <property name="iconSize">
+     <size>
+      <width>119</width>
+      <height>104</height>
+     </size>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pushButton_ap_spine">
+    <property name="geometry">
+     <rect>
+      <x>191</x>
+      <y>447</y>
+      <width>119</width>
+      <height>104</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">QPushButton{
+	border:none;
+	background-image: url(:/images/b_ap_spine_norm.png);
+}
+
+QPushButton:pressed{
+	border:none;
+	background-image: url(:/images/b_ap_spine_down.png);
+}</string>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+    <property name="iconSize">
+     <size>
+      <width>119</width>
+      <height>104</height>
+     </size>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pushButton_left_femur">
+    <property name="geometry">
+     <rect>
+      <x>62</x>
+      <y>447</y>
+      <width>119</width>
+      <height>104</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">QPushButton{
+	border:none;
+	background-image: url(:/images/b_left_femur_norm.png);
+}
+
+QPushButton:pressed{
+	border:none;
+	background-image: url(:/images/b_left_femur_down.png);
+}</string>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+    <property name="iconSize">
+     <size>
+      <width>119</width>
+      <height>104</height>
+     </size>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pushButton_right_femur">
+    <property name="geometry">
+     <rect>
+      <x>320</x>
+      <y>447</y>
+      <width>119</width>
+      <height>104</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">QPushButton{
+	border:none;
+	background-image: url(:/images/b_right_femur_norm.png);
+}
+
+QPushButton:pressed{
+	border:none;
+	background-image: url(:/images/b_right_femur_down.png);
+}</string>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+    <property name="iconSize">
+     <size>
+      <width>119</width>
+      <height>104</height>
+     </size>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pushButton_select_colimator">
+    <property name="geometry">
+     <rect>
+      <x>565</x>
+      <y>57</y>
+      <width>94</width>
+      <height>94</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">QPushButton{
+	border:none;
+	background-image: url(:/images/m_collimator1_down.png);
+}
+</string>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+    <property name="iconSize">
+     <size>
+      <width>94</width>
+      <height>94</height>
+     </size>
+    </property>
+    <property name="flat">
+     <bool>false</bool>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pushButton_move_center">
+    <property name="geometry">
+     <rect>
+      <x>669</x>
+      <y>57</y>
+      <width>94</width>
+      <height>94</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">QPushButton{
+	border:none;
+	background-image: url(:/images/m_move_center_norm.png);
+}
+
+QPushButton:pressed{
+	border:none;
+	background-image: url(:/images/m_move_center_down.png);
+}</string>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+    <property name="iconSize">
+     <size>
+      <width>94</width>
+      <height>94</height>
+     </size>
+    </property>
+    <property name="flat">
+     <bool>false</bool>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pushButton_movi_left">
+    <property name="geometry">
+     <rect>
+      <x>773</x>
+      <y>57</y>
+      <width>94</width>
+      <height>94</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">QPushButton{
+	border:none;
+	
+	background-image: url(:/images/m_patient_off_left_norm.png);
+}
+
+QPushButton:pressed{
+	border:none;
+	background-image: url(:/images/m_patient_off_left_down.png);
+}</string>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+    <property name="iconSize">
+     <size>
+      <width>94</width>
+      <height>94</height>
+     </size>
+    </property>
+    <property name="flat">
+     <bool>false</bool>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pushButton_setting">
+    <property name="geometry">
+     <rect>
+      <x>877</x>
+      <y>57</y>
+      <width>94</width>
+      <height>94</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">QPushButton{
+	border:none;
+	background-image: url(:/images/m_config_norm.png);
+}
+
+QPushButton:pressed{
+	border:none;
+	background-image: url(:/images/m_config_down.png);
+}</string>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+    <property name="iconSize">
+     <size>
+      <width>94</width>
+      <height>94</height>
+     </size>
+    </property>
+    <property name="flat">
+     <bool>false</bool>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pushButton_motor_up">
+    <property name="geometry">
+     <rect>
+      <x>688</x>
+      <y>214</y>
+      <width>162</width>
+      <height>155</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">QPushButton{
+	border:none;
+	background-image: url(:/images/arrow_up_norm.png);
+}
+
+QPushButton:pressed{
+	border:none;
+	background-image: url(:/images/arrow_up_down.png);
+}</string>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+    <property name="iconSize">
+     <size>
+      <width>162</width>
+      <height>155</height>
+     </size>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pushButton_motor_left">
+    <property name="geometry">
+     <rect>
+      <x>598</x>
+      <y>304</y>
+      <width>155</width>
+      <height>162</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">QPushButton{
+	border:none;
+	background-image: url(:/images/arrow_left_norm.png);
+}
+
+QPushButton:pressed{
+	border:none;
+	background-image: url(:/images/arrow_left_down.png);
+}</string>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+    <property name="iconSize">
+     <size>
+      <width>162</width>
+      <height>155</height>
+     </size>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pushButton_motor_right">
+    <property name="geometry">
+     <rect>
+      <x>785</x>
+      <y>304</y>
+      <width>155</width>
+      <height>162</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">QPushButton{
+	border:none;
+	background-image: url(:/images/arrow_right_norm.png);
+}
+
+QPushButton:pressed{
+	border:none;
+	background-image: url(:/images/arrow_right_down.png);
+}</string>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+    <property name="iconSize">
+     <size>
+      <width>162</width>
+      <height>155</height>
+     </size>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pushButton_motor_down">
+    <property name="geometry">
+     <rect>
+      <x>688</x>
+      <y>401</y>
+      <width>162</width>
+      <height>155</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">QPushButton{
+	border:none;
+	background-image: url(:/images/arrow_down_norm.png);
+}
+
+QPushButton:pressed{
+	border:none;
+	background-image: url(:/images/arrow_down_down.png);
+}</string>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+    <property name="iconSize">
+     <size>
+      <width>162</width>
+      <height>155</height>
+     </size>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_xray_on">
+    <property name="geometry">
+     <rect>
+      <x>62</x>
+      <y>57</y>
+      <width>119</width>
+      <height>94</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">QLabel{
+	border:none;
+	background-image: url(:/images/1_off.png);
+}
+
+</string>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_left_limit">
+    <property name="geometry">
+     <rect>
+      <x>530</x>
+      <y>380</y>
+      <width>48</width>
+      <height>16</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_right_limit">
+    <property name="geometry">
+     <rect>
+      <x>960</x>
+      <y>380</y>
+      <width>48</width>
+      <height>16</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_up_limit">
+    <property name="geometry">
+     <rect>
+      <x>750</x>
+      <y>190</y>
+      <width>48</width>
+      <height>16</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_down_limit">
+    <property name="geometry">
+     <rect>
+      <x>750</x>
+      <y>560</y>
+      <width>48</width>
+      <height>16</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pushButton_laser">
+    <property name="geometry">
+     <rect>
+      <x>320</x>
+      <y>57</y>
+      <width>119</width>
+      <height>94</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">QPushButton{
+	border:none;
+	background-image: url(:/images/3_off.png);
+}
+
+QPushButton:pressed{
+	border:none;
+	background-image: url(:/images/3_on.png);
+}</string>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+   </widget>
+  </widget>
+ </widget>
+ <resources>
+  <include location="../resources/resources.qrc"/>
+ </resources>
+ <connections/>
+</ui>
