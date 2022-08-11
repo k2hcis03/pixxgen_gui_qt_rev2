@@ -5,8 +5,6 @@
 """
 import os
 import sys
-import pickle
-import re  
 import init
    
 from logger import logger as logging
@@ -16,6 +14,8 @@ from dc_motor import DcMotor as DCMOTOR
 from collimator import Collimator as COLLMOTOR
 from uarts import Uarts as UARTS
 from concurrent.futures import ThreadPoolExecutor 
+
+from dialogs import PasswordDialog as password
 import sensor_timer
 import threading
 import queue
@@ -114,7 +114,9 @@ class MainWindow(QMainWindow, ui):
         
         self.pushButton_move_center.clicked.connect(self.move_center_position)
         self.pushButton_move_left.clicked.connect(self.move_left_position)
-
+        self.pushButton_setting.clicked.connect(self.set_config)
+        
+        
     def chang_collimator(self):
         self.collimator_rotate += 1
         self.collimator_rotate %= 5
@@ -204,6 +206,15 @@ class MainWindow(QMainWindow, ui):
             'timeout'   : 60*1000
         }
         self.command_queue.put(message)
+    
+    def set_config(self):
+        logging.info('set_config clicked')
+        ret = password()
+        
+        if ret.exec():
+            print('Success')
+        else:
+            print('Cancel!')
         
 def main():
     app = QApplication(sys.argv)
