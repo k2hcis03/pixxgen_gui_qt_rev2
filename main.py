@@ -47,9 +47,9 @@ class MainWindow(QMainWindow, ui):
         self.setWindowFlag(Qt.FramelessWindowHint)
         self.setupUi(self)
         
-        self.toggle_laser = False       #레이저 다이오드 온 오프
+        self.toggle_laser = False       #레이저 다이오드 온 오프 for 이미지 변환
         self.command_queue = None
-        
+        self.coll_laser = 0             #레이저 다이오드 1, 2, 온 오프 플래그
         # cc = Config("./config.ini")
         cc = Config("/home/pi/Projects/pixxgen_gui_qt/config.ini")      # For VSC
         motor_speed = cc.get_map('motor_speed')
@@ -184,11 +184,18 @@ class MainWindow(QMainWindow, ui):
         logging.info(f'pushButton_laser clicked : {self.toggle_laser}')
         
         if self.toggle_laser:
+            # 레이저 1, 2 ON
+            self.coll_laser = self.coll_laser & ~0x03
+            self.coll_motor.coll_extout_start(6, self.coll_laser)
+            
             self.toggle_laser = not self.toggle_laser
             collimator_border = f'QPushButton{{border: none;}}'
             collimator_choice = f'QPushButton{{background-image: url(:/images/3_off.png)}}'
             self.pushButton_laser.setStyleSheet(collimator_border + collimator_choice)
         else:
+            # 레이저 1, 2 OFF
+            self.coll_laser = self.coll_laser  | 0x03
+            self.coll_motor.coll_extout_start(6, self.coll_laser) 
             self.toggle_laser = not self.toggle_laser
             collimator_border = f'QPushButton{{border: none;}}'
             collimator_choice = f'QPushButton{{background-image: url(:/images/3_on.png)}}'

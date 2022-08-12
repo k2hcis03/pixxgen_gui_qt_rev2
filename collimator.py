@@ -39,7 +39,8 @@ class Collimator:
     def coll_extout_start(self, number, on_off):
         _ioctl = user_ioctl.IOCTLRequest()
         data = user_ioctl.StructIOCTL()
+        data.collimator_motor_count = 0x12345678
         data.collimator_motor_number = number  # 1, 2, 4, 8, 16, 1F = all , 6 = Laser on, off
-        data.collimator_motor_laser = on_off  # 1, 2, 4, 8, 16, 1F = all , 0 = Laser on, off
+        data.collimator_motor_laser = on_off   # 0 = Laser on, off
         SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_COLLIMATOR, ctypes.sizeof(data))
         fcntl.ioctl(self.dev_coll_i2c, SET_DATA, data)
