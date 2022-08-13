@@ -15,6 +15,7 @@ class MotorPosition(threading.Thread):
         self.motor_centor_count = 100000
         self.daemon = True
         self.timeout = 0
+        
     def run(self):
         while True:
             message = self.queue.get()

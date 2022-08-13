@@ -4,7 +4,8 @@
 @K2H
 """
 import os
-import sys
+import sys, time
+from tkinter import messagebox
 import init
    
 from logger import logger as logging
@@ -16,6 +17,8 @@ from uarts import Uarts as UARTS
 from concurrent.futures import ThreadPoolExecutor 
 
 from dialogs import PasswordDialog as password
+from dialogs import ConfigDialog as configuration
+
 import sensor_timer
 import threading
 import queue
@@ -59,6 +62,8 @@ class MainWindow(QMainWindow, ui):
         self.st2_min_speed = motor_speed['ST2MINSPEED']
         self.st3_max_speed = motor_speed['ST3MAXSPEED']
         self.st3_min_speed = motor_speed['ST3MINSPEED']
+        self.coll1_max_speed = motor_speed['COLL1MAXSPEED']
+        self.coll1_min_speed = motor_speed['COLL1MINSPEED']
         self.dc1_max_speed = motor_speed['DC1MAXSPEED']
         self.dc1_min_speed = motor_speed['DC1MINSPEED']
 
@@ -83,6 +88,9 @@ class MainWindow(QMainWindow, ui):
         else:
             logging.info('하드웨어 초기화 실패')
 
+        # 콜리미터 모터 초기 위치 설정
+        self.coll_motor.coll_motor_start(1, True, self.coll1_max_speed, -288*4, True)  #288 = 90도 따라서 센서 검출때 까지 이동
+        time.sleep(2)
         
         # 모터 포시션 움직이는 쓰레드 생성
         # with ThreadPoolExecutor(max_workers=1) as executor:
@@ -115,19 +123,31 @@ class MainWindow(QMainWindow, ui):
         self.pushButton_move_center.clicked.connect(self.move_center_position)
         self.pushButton_move_left.clicked.connect(self.move_left_position)
         self.pushButton_setting.clicked.connect(self.set_config)
+        self.pushButton_mode.clicked.connect(self.set_mode)
+
+        # 콜리미터 모터 정지
+        self.coll_motor.coll_motor_start(1, False, 0, 0, 0)
+        # 첫번째 콜리미터 위치 이동
+        self.coll_motor.coll_motor_start(1, True, self.coll1_min_speed, 288, True)  #288 = 90도
+        time.sleep(1)
         
-        
-    def chang_collimator(self):
+    def chang_collimator(self):        
         self.collimator_rotate += 1
         self.collimator_rotate %= 5
 
         if self.collimator_rotate == 0:
+            # 콜리미터 모터 초기 위치 설정
+            self.coll_motor.coll_motor_start(1, True, self.coll1_max_speed, -288*4, True)  #288 = 90도
+            time.sleep(2)
             self.collimator_rotate = 1
-
+        # 다음 콜리미터 위치 이동
+        self.coll_motor.coll_motor_start(1, True, self.coll1_min_speed, 288, True)  #288 = 90도
+        
         collimator_border = f'QPushButton{{border: none;}}'
         collimator_choice = f'QPushButton{{background-image: url(:/images/m_collimator{self.collimator_rotate}_down.png)}}'
         self.pushButton_select_colimator.setStyleSheet(collimator_border + collimator_choice)
-
+        logging.info(f'chang_collimator clicked : {self.collimator_rotate}')
+        
     def move_motor_left_press(self, pressed):
         logging.info(f'move_motor_left pressed : {pressed}')
         print('move_motor_left pressed', pressed)
@@ -210,18 +230,30 @@ class MainWindow(QMainWindow, ui):
             'position'  : 'left',
             'speed'     : 1000,
             'count'     : 0, 
-            'timeout'   : 60*1000
+            'timeout'   : 60*1000   #1분
         }
         self.command_queue.put(message)
     
     def set_config(self):
         logging.info('set_config clicked')
-        ret = password()
+        ret = password(self)
+        config = configuration(self, self.init.gpio_i2c_parsing_data)
+        # config.setWindowModality(Qt.ApplicationModal)
+        config.setWindowModality(Qt.NonModal)
         
         if ret.exec():
-            print('Success')
+            if ret.password == str(1234):
+                config.show()
+                config.start()
+            else:
+                QMessageBox.warning(self, "Warning", "Wrong Password")
         else:
-            print('Cancel!')
+            print('cancel')
+    
+    def set_mode(self):
+        self.timer1.thread_timer_gpio_read_stop()
+        time.sleep(0.1)
+        QApplication.quit()
         
 def main():
     app = QApplication(sys.argv)

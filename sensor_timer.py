@@ -165,8 +165,9 @@ class GPIORead:
 
             self.motor_limit_left_switch_detect(DC_MOTOR, 1, "dc1_enc1")
             self.motor_limit_right_switch_detect(DC_MOTOR, 1, "dc1_enc2")
-            self.motor_limit_left_switch_detect(DC_MOTOR, 2, "dc2_enc1")
-            self.motor_limit_right_switch_detect(DC_MOTOR, 2, "dc2_enc2")
+            
+            # self.motor_limit_left_switch_detect(DC_MOTOR, 2, "dc2_enc1")
+            # self.motor_limit_right_switch_detect(DC_MOTOR, 2, "dc2_enc2")
 
             threading.Timer(0.005, self.thread_gpio_read).start()  # 폴링 시간은 5ms
 
