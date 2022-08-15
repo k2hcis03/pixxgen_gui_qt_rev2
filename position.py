@@ -19,18 +19,31 @@ class MotorPosition(threading.Thread):
     def run(self):
         while True:
             message = self.queue.get()
-            time.sleep(10)
-            
+       
             while True:
                 if message['position'] == 'left':
                     completed = self.move_left_position(message)
                     
                     if completed > 0:
                         self.logging.info('move_left_position completed')
+                        self.send_command = False
                         break
                     elif completed < 0:
                         self.logging.info('move_left_position time out!')
-
+                        self.send_command = False
+                        break
+                elif message['position'] == 'right': 
+                    completed = self.move_right_position(message)
+                    
+                    if completed > 0:
+                        self.logging.info('move_right_position completed')
+                        self.send_command = False
+                        break
+                    elif completed < 0:
+                        self.logging.info('move_right_position time out!')
+                        self.send_command = False
+                        break
+                
     def move_left_position(self, message) -> int:    #1을 리턴하면 위치 도착 0을 리턴하면 이동 중. 
         if self.gpio_i2c_parsing_data['step1_enc3'][2]:
             self.send_command = False
@@ -39,7 +52,7 @@ class MotorPosition(threading.Thread):
         if not self.send_command:
             self.timeout = time.time()
             self.st_motor.st_motor_enable(1, True)
-            self.st_motor.st_motor_start(1, True, message['speed'], -160000000)
+            self.st_motor.st_motor_start(1, True, message['speed'], message['count'])
             self.send_command = True
         
         if time.time() - self.timeout >= message['timeout']:
@@ -51,11 +64,16 @@ class MotorPosition(threading.Thread):
         if self.gpio_i2c_parsing_data['step1_enc1'][2]:
             self.send_command = False
             return 1
-
+        
         if not self.send_command:
+            self.timeout = time.time()
             self.st_motor.st_motor_enable(1, True)
-            self.st_motor.st_motor_start(1, True, message['speed'], 160000000)
+            self.st_motor.st_motor_start(1, True, message['speed'], message['count'])
             self.send_command = True
+        
+        if time.time() - self.timeout >= message['timeout']:
+            return -1
+        
         return 0
 
     def move_center_position(self, message):
