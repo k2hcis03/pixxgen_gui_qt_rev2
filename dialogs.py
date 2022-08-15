@@ -71,7 +71,7 @@ class ConfigDialog(QDialog, ui_config, threading.Thread):
         self.thread_run = True
         self.gpio_i2c_parsing_data = gpio_i2c_parsing_data
         self.pushButton_OK.clicked.connect(self.ok_clicked)
-        
+         
     def run(self):
         while(True):
             time.sleep(0.5)
