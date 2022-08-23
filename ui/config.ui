@@ -177,7 +177,7 @@
     <string>ST1 MOTOR</string>
    </property>
   </widget>
-  <widget class="QCheckBox" name="checkBox_dc2_right">
+  <widget class="QCheckBox" name="checkBox_dc1_right">
    <property name="enabled">
     <bool>false</bool>
    </property>

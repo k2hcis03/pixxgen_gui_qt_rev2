@@ -82,7 +82,7 @@ class ConfigDialog(QDialog, ui_config, threading.Thread):
             else:
                 self.checkBox_st1_left.setCheckState(Qt.Unchecked)    
             
-            if self.gpio_i2c_parsing_data['step1_enc3'][2]:             #left limit sensor
+            if self.gpio_i2c_parsing_data['step1_enc3'][2]:             #right limit sensor
                 self.checkBox_st1_right.setCheckState(Qt.Checked)
             else:
                 self.checkBox_st1_right.setCheckState(Qt.Unchecked) 
@@ -90,23 +90,43 @@ class ConfigDialog(QDialog, ui_config, threading.Thread):
             if self.gpio_i2c_parsing_data['step2_enc1'][2]:             #left limit sensor
                 self.checkBox_st2_left.setCheckState(Qt.Checked)
             else:
-                self.checkBox_st2_right.setCheckState(Qt.Unchecked) 
+                self.checkBox_st2_left.setCheckState(Qt.Unchecked) 
             
+            if self.gpio_i2c_parsing_data['step2_enc3'][2]:             #right limit sensor
+                self.checkBox_st2_right.setCheckState(Qt.Checked)
+            else:
+                self.checkBox_st2_right.setCheckState(Qt.Unchecked) 
+                
             if self.gpio_i2c_parsing_data['step3_enc1'][2]:             #left limit sensor
                 self.checkBox_st3_left.setCheckState(Qt.Checked)
             else:
+                self.checkBox_st3_left.setCheckState(Qt.Unchecked) 
+            
+            if self.gpio_i2c_parsing_data['step3_enc2'][2]:             #right limit sensor
+                self.checkBox_st3_right.setCheckState(Qt.Checked)
+            else:
                 self.checkBox_st3_right.setCheckState(Qt.Unchecked) 
-               
+                
             if self.gpio_i2c_parsing_data['step4_enc1'][2]:             #left limit sensor
                 self.checkBox_coll_left.setCheckState(Qt.Checked)
             else:
+                self.checkBox_coll_left.setCheckState(Qt.Unchecked) 
+            
+            if self.gpio_i2c_parsing_data['step4_enc2'][2]:             #right limit sensor
+                self.checkBox_coll_right.setCheckState(Qt.Checked)
+            else:
                 self.checkBox_coll_right.setCheckState(Qt.Unchecked) 
-                 
+                  
             if self.gpio_i2c_parsing_data['dc1_enc1'][2]:               #left limit sensor
                 self.checkBox_dc1_left.setCheckState(Qt.Checked)
             else:
+                self.checkBox_dc1_left.setCheckState(Qt.Unchecked) 
+            
+            if self.gpio_i2c_parsing_data['dc1_enc2'][2]:               #right limit sensor
+                self.checkBox_dc1_right.setCheckState(Qt.Checked)
+            else:
                 self.checkBox_dc1_right.setCheckState(Qt.Unchecked) 
-                
+                   
             if not self.thread_run:
                 break
     

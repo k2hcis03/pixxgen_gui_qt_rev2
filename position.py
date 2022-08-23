@@ -3,11 +3,17 @@ import time
 
 from PyQt5.QtCore import QThread
 import threading
+import queue
+
+TIME_OUT = 1
+SENSOR_DETECT = 2
+COUNT_REACH = 3
+FORCE_STOP = 4
 
 class MotorPosition(threading.Thread):
-    def __init__(self, parent, queue, st_motor, gpio_i2c_parsing_data, logging) -> None:
+    def __init__(self, parent, work_queue, st_motor, gpio_i2c_parsing_data, _lock, logging) -> None:
         threading.Thread.__init__(self)
-        self.queue = queue
+        self.command_queue = work_queue
         self.st_motor = st_motor
         self.gpio_i2c_parsing_data = gpio_i2c_parsing_data
         self.logging = logging
@@ -15,39 +21,57 @@ class MotorPosition(threading.Thread):
         self.motor_centor_count = 100000
         self.daemon = True
         self.timeout = 0
+        self._lock = _lock
+        self.not_doing_work = False
         
     def run(self):
         while True:
-            message = self.queue.get()
+            message = self.command_queue.get()
        
             while True:
                 if message['position'] == 'left':
                     completed = self.move_left_position(message)
                     
-                    if completed > 0:
-                        self.logging.info('move_left_position completed')
+                    if completed == SENSOR_DETECT:
+                        self.logging.info('move_left_position completed by sensor')
                         self.send_command = False
                         break
-                    elif completed < 0:
+                    elif completed == COUNT_REACH:
+                        self.logging.info('move_left_position completed by counter')
+                        self.send_command = False
+                        break
+                    elif completed == TIME_OUT:
                         self.logging.info('move_left_position time out!')
                         self.send_command = False
                         break
+                    elif completed == FORCE_STOP:
+                        self.logging.info('move_left_position stopped by force')
+                        self.send_command = False
+                        break
+                    
                 elif message['position'] == 'right': 
                     completed = self.move_right_position(message)
                     
-                    if completed > 0:
-                        self.logging.info('move_right_position completed')
+                    if completed == SENSOR_DETECT:
+                        self.logging.info('move_right_position completed by sensor')
                         self.send_command = False
                         break
-                    elif completed < 0:
+                    elif completed == COUNT_REACH:
+                        self.logging.info('move_left_position completed by counter')
+                        self.send_command = False
+                        break
+                    elif completed == TIME_OUT:
                         self.logging.info('move_right_position time out!')
                         self.send_command = False
                         break
-                
+                    elif completed == FORCE_STOP:
+                        self.logging.info('move_left_position stopped by force')
+                        self.send_command = False
+                        break
+                    
     def move_left_position(self, message) -> int:    #1을 리턴하면 위치 도착 0을 리턴하면 이동 중. 
         if self.gpio_i2c_parsing_data['step1_enc3'][2]:
-            self.send_command = False
-            return 1
+            return SENSOR_DETECT
 
         if not self.send_command:
             self.timeout = time.time()
@@ -56,14 +80,21 @@ class MotorPosition(threading.Thread):
             self.send_command = True
         
         if time.time() - self.timeout >= message['timeout']:
-            return -1
+            return TIME_OUT
         
+        if self.not_doing_work:
+            return FORCE_STOP
+
+        with open('/sys/bus/platform/drivers/pixggen_gpio/equipment/pixxgen_sys/counter1') as count:
+            motor_count = int(count.readline())
+            
+            if motor_count == 0:
+                return 2
         return 0
     
     def move_right_position(self, message) -> int:    #1을 리턴하면 위치 도착 0을 리턴하면 이동 중.
         if self.gpio_i2c_parsing_data['step1_enc1'][2]:
-            self.send_command = False
-            return 1
+            return SENSOR_DETECT
         
         if not self.send_command:
             self.timeout = time.time()
@@ -72,8 +103,16 @@ class MotorPosition(threading.Thread):
             self.send_command = True
         
         if time.time() - self.timeout >= message['timeout']:
-            return -1
+            return TIME_OUT
         
+        if self.not_doing_work:
+            return FORCE_STOP
+        
+        with open('/sys/bus/platform/drivers/pixggen_gpio/equipment/pixxgen_sys/counter1') as count:
+            motor_count = int(count.readline())
+            
+            if motor_count == 0:
+                return COUNT_REACH
         return 0
 
     def move_center_position(self, message):
@@ -81,3 +120,20 @@ class MotorPosition(threading.Thread):
             self.st_motor.st_motor_enable(1, True)
             self.st_motor.st_motor_start(1, True, message['max_speed'], self.motor_centor_count)
             self.send_command = True
+
+    def set_command_stop(self, on_off):
+        self.not_doing_work = on_off
+        
+        #강제 스톱이 오면 큐를 비운다.
+        if on_off:
+            while True:
+                try:
+                    message = self.command_queue.get(False)
+                except queue.Empty:
+                    self.logging.info('명령어 큐를 모두 비움')
+                    break
+                else:
+                    self.logging.info('명령어 큐에 명령어가 있음')
+                    
+            
+        

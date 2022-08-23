@@ -43,7 +43,9 @@ background-image: url(:/images/0_background.png);}</string>
      </rect>
     </property>
     <property name="styleSheet">
-     <string notr="true">background-color: rgb(25, 75, 136);</string>
+     <string notr="true">QWidget#frame{
+	background-color: rgb(25, 75, 136);
+}</string>
     </property>
     <property name="frameShape">
      <enum>QFrame::StyledPanel</enum>
@@ -51,6 +53,19 @@ background-image: url(:/images/0_background.png);}</string>
     <property name="frameShadow">
      <enum>QFrame::Raised</enum>
     </property>
+    <widget class="QPushButton" name="pushButton_exit">
+     <property name="geometry">
+      <rect>
+       <x>940</x>
+       <y>10</y>
+       <width>75</width>
+       <height>24</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>EXIT</string>
+     </property>
+    </widget>
    </widget>
    <widget class="QPushButton" name="pushButton_total_body">
     <property name="geometry">

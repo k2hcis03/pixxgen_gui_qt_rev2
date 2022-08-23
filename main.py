@@ -67,6 +67,8 @@ class MainWindow(QMainWindow, ui):
         self.dc1_max_speed = motor_speed['DC1MAXSPEED']
         self.dc1_min_speed = motor_speed['DC1MINSPEED']
 
+        self.motor_poistion = None
+        self.motor_stopped = False
         # 하드웨어 초기화
         self.init = init.HardwareInit(logging)
         
@@ -97,8 +99,10 @@ class MainWindow(QMainWindow, ui):
         
         logging.info('MotorPosition thread is created')
         self.command_queue = queue.Queue(maxsize=10)
-        motor_poistion = position.MotorPosition(self, self.command_queue, self.st_motor, self.init.gpio_i2c_parsing_data, logging)
-        motor_poistion.start()
+        self._lock = threading.Lock()
+        
+        self.motor_poistion = position.MotorPosition(self, self.command_queue, self.st_motor, self.init.gpio_i2c_parsing_data, self._lock, logging)
+        self.motor_poistion.start()
         
         self.pushButton_select_colimator.clicked.connect(self.chang_collimator)
 
@@ -120,7 +124,7 @@ class MainWindow(QMainWindow, ui):
         self.pushButton_move_left.clicked.connect(self.move_left_position)
         self.pushButton_setting.clicked.connect(self.set_config)
         self.pushButton_mode.clicked.connect(self.set_mode)
-
+        self.pushButton_exit.clicked.connect(self.exit_program)
         # 첫번째 콜리미터 위치 이동
         self.coll_motor.coll_motor_start(1, True, self.coll1_min_speed, -288*10, True)  #288 = 90도
         time.sleep(2)
@@ -144,9 +148,9 @@ class MainWindow(QMainWindow, ui):
             time.sleep(1)
             self.enable_button(self.pushButton_select_colimator, True)
             
-        collimator_border = f'QPushButton{{border: none;}}'
-        collimator_choice = f'QPushButton{{background-image: url(:/images/m_collimator{self.collimator_rotate}_down.png)}}'
-        self.pushButton_select_colimator.setStyleSheet(collimator_border + collimator_choice)
+        button_border = f'QPushButton{{border: none;}}'
+        button_choice = f'QPushButton{{background-image: url(:/images/m_collimator{self.collimator_rotate}_down.png)}}'
+        self.pushButton_select_colimator.setStyleSheet(button_border + button_choice)
         logging.info(f'chang_collimator clicked : {self.collimator_rotate}')
     
     def enable_button(self, button, enable):
@@ -158,7 +162,8 @@ class MainWindow(QMainWindow, ui):
     def move_motor_left_press(self, pressed):
         logging.info(f'move_motor_left pressed : {pressed}')
         print('move_motor_left pressed', pressed)
-
+        self.motor_poistion.set_command_stop(True)  #기존 동작 강제 스톱
+        
         if pressed:
             self.st_motor.st_motor_enable(1, True)
             self.st_motor.st_motor_start(1, True, self.st1_max_speed, -160000000)
@@ -169,7 +174,8 @@ class MainWindow(QMainWindow, ui):
     def move_motor_right_press(self, pressed):
         logging.info(f'move_motor_right pressed : {pressed}')
         print('move_motor_right pressed', pressed)
-
+        self.motor_poistion.set_command_stop(True)  #기존 동작 강제 스톱
+        
         if pressed:
             self.st_motor.st_motor_enable(1, True)
             self.st_motor.st_motor_start(1, True, self.st1_max_speed, 160000000)
@@ -180,7 +186,11 @@ class MainWindow(QMainWindow, ui):
     def move_motor_up_press(self, pressed):
         logging.info(f'move_motor_up pressed : {pressed}')
         print('move_motor_up_press pressed', pressed)
-
+        self.motor_poistion.set_command_stop(True)  #기존 동작 강제 스톱
+        
+        self.st_motor.st_motor_enable(1, False)
+        self.st_motor.st_motor_start(1, False, 0, 0)
+            
         if pressed:
             self.st_motor.st_motor_enable(2, True)
             self.st_motor.st_motor_enable(3, True)
@@ -195,7 +205,11 @@ class MainWindow(QMainWindow, ui):
     def move_motor_down_press(self, pressed):
         logging.info(f'move_motor_down pressed : {pressed}')
         print('move_motor_down_press pressed', pressed)
-
+        self.motor_poistion.set_command_stop(True)  #기존 동작 강제 스톱
+        
+        self.st_motor.st_motor_enable(1, False)
+        self.st_motor.st_motor_start(1, False, 0, 0)
+        
         if pressed:
             self.st_motor.st_motor_enable(2, True)
             self.st_motor.st_motor_enable(3, True)
@@ -216,19 +230,19 @@ class MainWindow(QMainWindow, ui):
             self.coll_motor.coll_extout_start(6, self.coll_laser)
             
             self.toggle_laser = not self.toggle_laser
-            collimator_border = f'QPushButton{{border: none;}}'
-            collimator_choice = f'QPushButton{{background-image: url(:/images/3_off.png)}}'
-            self.pushButton_laser.setStyleSheet(collimator_border + collimator_choice)
+            button_border = f'QPushButton{{border: none;}}'
+            button_choice = f'QPushButton{{background-image: url(:/images/3_off.png)}}'
+            self.pushButton_laser.setStyleSheet(button_border + button_choice)
         else:
             # 레이저 1, 2 OFF
             self.coll_laser = self.coll_laser  | 0x03
             self.coll_motor.coll_extout_start(6, self.coll_laser) 
             self.toggle_laser = not self.toggle_laser
-            collimator_border = f'QPushButton{{border: none;}}'
-            collimator_choice = f'QPushButton{{background-image: url(:/images/3_on.png)}}'
-            self.pushButton_laser.setStyleSheet(collimator_border + collimator_choice)
+            button_border = f'QPushButton{{border: none;}}'
+            button_choice = f'QPushButton{{background-image: url(:/images/3_on.png)}}'
+            self.pushButton_laser.setStyleSheet(button_border + button_choice)
     
-    def move_center_position(self):
+    def move_center_position(self): 
         logging.info(f'pushButton_move_center clicked')
         message = {
             'position'  : 'left',
@@ -244,6 +258,7 @@ class MainWindow(QMainWindow, ui):
             'timeout'   : 60   #1분
         }
         self.command_queue.put(message)
+        self.motor_poistion.set_command_stop(False)
         
     def move_left_position(self):
         logging.info(f'pushButton_move_left clicked')
@@ -254,7 +269,10 @@ class MainWindow(QMainWindow, ui):
             'timeout'   : 60   #1분
         }
         self.command_queue.put(message)
-    
+        self.motor_poistion.set_command_stop(False)
+        # button_border = f'QPushButton{{border: none;}}'
+        # button_choice = f'QPushButton{{background-image: url(:/images/m_collimator{self.collimator_rotate}_down.png)}}'
+        # self.pushButton_select_colimator.setStyleSheet(button_border + button_choice)
     def set_config(self):
         logging.info('set_config clicked')
         ret = password(self)
@@ -271,11 +289,44 @@ class MainWindow(QMainWindow, ui):
         else:
             print('cancel')
     
-    def set_mode(self):
+    def set_mode(self):         #모터 정지 기능 수행 그림 변경 필요
+        self.motor_poistion.set_command_stop(True)
+        # button_border = f'QPushButton{{border: none;}}'
+        # button_choice = f'QPushButton{{background-image: url(:/images/b_mode_down.png)}}'
+        self.motor_stopped = True
+        # time.sleep(0.01)
+        # 모터 스톱
+        self.st_motor.st_motor_enable(1, False)
+        self.st_motor.st_motor_start(1, False, 0, 0)
+        self.st_motor.st_motor_enable(2, False)
+        self.st_motor.st_motor_start(2, False, 0, 0)
+        self.st_motor.st_motor_enable(3, False)
+        self.st_motor.st_motor_start(3, False, 0, 0)
+        print(self.motor_stopped)
+        
+        # self.pushButton_mode.setStyleSheet(button_border + button_choice)
+    
+    def exit_program(self):
         self.timer1.thread_timer_gpio_read_stop()
         time.sleep(0.1)
         QApplication.quit()
-        
+    
+    def motor_buttons_disable(self, on_off):
+        if on_off:
+            self.pushButton_motor_left.setDisabled(True)
+            self.pushButton_motor_right.setDisabled(True)
+            self.pushButton_motor_up.setDisabled(True)
+            self.pushButton_motor_down.setDisabled(True)      
+            self.pushButton_move_center.setDisabled(True)
+            self.pushButton_move_left.setDisabled(True)
+        else:
+            self.pushButton_motor_left.setEnabled(True)
+            self.pushButton_motor_right.setEnabled(True)
+            self.pushButton_motor_up.setEnabled(True)
+            self.pushButton_motor_down.setEnabled(True)      
+            self.pushButton_move_center.setEnabled(True)
+            self.pushButton_move_left.setEnabled(True)
+            
 def main():
     app = QApplication(sys.argv)
     windows = MainWindow()

@@ -37,6 +37,7 @@ class HardwareInit():
                 
                 "step3_enc1" : [0, "active_low", 0],
                 "step3_enc2" : [0, "active_low", 0],
+                
                 "step4_enc1" : [0, "active_low", 0],
                 "step4_enc2" : [0, "active_low", 0],  
                 
