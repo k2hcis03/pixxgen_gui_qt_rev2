@@ -7,6 +7,10 @@ import os
 import sys
 import threading, time
 
+import fcntl
+import user_ioctl
+import ctypes
+
 # from PySide6 import QtWidgets
 # from PySide6.QtWidgets import QApplication, QMainWindow, QLineEdit, QDialog, QMessageBox, QWidget, QFontDialog
 # from PySide6.QtGui import QPixmap, QIcon
@@ -59,7 +63,7 @@ class PasswordDialog(QDialog, ui_password):
             self.lineEdit_password.clear()
 
 class ConfigDialog(QDialog, ui_config, threading.Thread):
-    def __init__(self, parent, gpio_i2c_parsing_data, dc_motor):
+    def __init__(self, parent, gpio_i2c_parsing_data, dc_motor, uart_power1, uart_power2, dev_gpio_handle):
         super(ConfigDialog, self).__init__(parent)
         threading.Thread.__init__(self)
         # icon = QIcon("./asserts/bell.png")
@@ -70,11 +74,30 @@ class ConfigDialog(QDialog, ui_config, threading.Thread):
         self.daemon = True
         self.thread_run = True
         self.gpio_i2c_parsing_data = gpio_i2c_parsing_data
+        self.dev_gpio_handle = dev_gpio_handle
         self.pushButton_OK.clicked.connect(self.ok_clicked)
+        
+        self.uart_power1 = uart_power1
+        self.uart_power2 = uart_power2
         
         self.dc_motor = dc_motor
         self.pushButton_dc_motor_up.clicked.connect(self.move_dc_motor_up)
         self.pushButton_dc_motor_down.clicked.connect(self.move_dc_motor_down)
+        
+        self.pushButton_xray1_kv.clicked.connect(lambda: self.set_xray_kv(1))
+        self.pushButton_xray2_kv.clicked.connect(lambda: self.set_xray_kv(2))
+        
+        self.pushButton_xray1_ma.clicked.connect(lambda: self.set_xray_ma(1))
+        self.pushButton_xray2_ma.clicked.connect(lambda: self.set_xray_ma(2))
+        
+        self.pushButton_xray1_sec.clicked.connect(lambda: self.set_xray_sec(1))
+        self.pushButton_xray2_sec.clicked.connect(lambda: self.set_xray_sec(2))
+        
+        self.pushButton_xray1_power_on.clicked.connect(lambda: self.on_xray_power(1))
+        self.pushButton_xray2_power_on.clicked.connect(lambda: self.on_xray_power(1))
+        
+        self.pushButton_xray1_power_off.clicked.connect(lambda: self.off_xray_power(1))
+        self.pushButton_xray2_power_off.clicked.connect(lambda: self.off_xray_power(1))
         
     def run(self):
         while(True):
@@ -145,3 +168,126 @@ class ConfigDialog(QDialog, ui_config, threading.Thread):
     def ok_clicked(self):
         self.thread_run = False
         self.close()
+        
+    def set_xray_kv(self, xray):
+        try:
+            if xray == 1:
+                power_volt = "[XV{:04}]".format(int(float(self.lineEdit_xray1_kv.text()) * 10))
+                self.uart_power1.send_serial(power_volt, self.lineEdit_xray1_status)
+            elif xray == 2:
+                power_volt = "[XV{:04}]".format(int(float(self.lineEdit_xray2_kv.text()) * 10))
+                self.uart_power1.send_serial(power_volt, self.lineEdit_xray2_status)
+        except ValueError as e:
+            print('check value')
+            
+    def set_xray_ma(self, xray):
+        try:
+            if xray == 1:
+                power_current = "[XA{:03}]".format(int(float(self.lineEdit_xray1_ma.text())))
+                self.uart_power1.send_serial(power_current, self.lineEdit_xray1_status)
+            elif xray == 2:
+                power_current = "[XA{:03}]".format(int(float(self.lineEdit_xray2_ma.text())))
+                self.uart_power1.send_serial(power_current, self.lineEdit_xray2_status)
+        except ValueError as e:
+            print('check value')
+                       
+    def set_xray_sec(self, xray):
+        try:
+            if xray == 1:
+                power_time = "[XT{:03}]".format(int(float(self.lineEdit_xray1_time.text()) * 10))
+                self.uart_power1.send_serial(power_time, self.lineEdit_xray1_status)
+            elif xray == 2:
+                power_time = "[XT{:03}]".format(int(float(self.lineEdit_xray2_time.text()) * 10))
+                self.uart_power1.send_serial(power_time, self.lineEdit_xray2_status)
+        except ValueError as e:
+            print('check value')
+            
+    def on_xray_power(self, xray):
+        if xray == 1:
+            if self.radioButton_xray1_continue.isChecked():
+                continuse_or_pulse_mode = "[XMC]"
+            else:
+                continuse_or_pulse_mode = "[XMP]"    
+            
+            if self.checkBox_xray1_buzzer.isChecked():
+                power_buz = "[XBON]"
+            else:
+                power_buz = "[XBOF]"
+            
+            self.uart_power1.send_serial(continuse_or_pulse_mode, self.lineEdit_xray1_status)
+            time.sleep(0.01)
+            self.uart_power1.send_serial(power_buz, self.lineEdit_xray1_status)
+            time.sleep(0.01)
+            
+            _ioctl = user_ioctl.IOCTLRequest()
+            data = user_ioctl.StructIOCTL()
+            
+            for i in range(13):
+                data.exout[i] = 0
+            data.exout[user_ioctl.XRAY1_READY] = 1
+            SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
+            fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+            time.sleep(0.2)  
+            
+            data.exout[user_ioctl.XRAY1_ON] = 1
+            SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
+            fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+        else:
+            if self.radioButton_xray2_continue.isChecked():
+                continuse_or_pulse_mode = "[XMC]"
+            else:
+                continuse_or_pulse_mode = "[XMP]"    
+            
+            if self.checkBox_xray2_buzzer.isChecked():
+                power_buz = "[XBON]"
+            else:
+                power_buz = "[XBOF]"
+            
+            self.uart_power2.send_serial(continuse_or_pulse_mode, self.lineEdit_xray2_status)
+            time.sleep(0.01)
+            self.uart_power2.send_serial(power_buz, self.lineEdit_xray2_status)
+            time.sleep(0.01)
+            
+            _ioctl = user_ioctl.IOCTLRequest()
+            data = user_ioctl.StructIOCTL()
+            
+            for i in range(13):
+                data.exout[i] = 0
+            data.exout[user_ioctl.XRAY2_READY] = 1
+            SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
+            fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+            time.sleep(0.2)  
+            
+            data.exout[user_ioctl.XRAY2_ON] = 1
+            SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
+            fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+            
+    def onff_xray_power(self, xray):
+        if xray == 1:
+            _ioctl = user_ioctl.IOCTLRequest()
+            data = user_ioctl.StructIOCTL()
+            
+            for i in range(13):
+                data.exout[i] = 0
+            data.exout[user_ioctl.XRAY1_ON] = 0
+            SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
+            fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+            time.sleep(0.5)  
+            
+            data.exout[user_ioctl.XRAY1_READY] = 0
+            SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
+            fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+        else:
+            _ioctl = user_ioctl.IOCTLRequest()
+            data = user_ioctl.StructIOCTL()
+            
+            for i in range(13):
+                data.exout[i] = 0
+            data.exout[user_ioctl.XRAY2_ON] = 0
+            SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
+            fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+            time.sleep(0.5)  
+            
+            data.exout[user_ioctl.XRAY2_READY] = 0
+            SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
+            fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)

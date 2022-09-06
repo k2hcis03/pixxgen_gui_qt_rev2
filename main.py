@@ -303,7 +303,8 @@ class MainWindow(QMainWindow, ui):
     def set_config(self):
         logging.info('set_config clicked')
         ret = password(self)
-        config = configuration(self, self.init.gpio_i2c_parsing_data, self.dc_motor)
+        config = configuration(self, self.init.gpio_i2c_parsing_data, self.dc_motor, 
+                               self.uart_power1, self.uart_power2, self.init.dev_gpio_handle)
         # config.setWindowModality(Qt.ApplicationModal)
         config.setWindowModality(Qt.NonModal)
         
