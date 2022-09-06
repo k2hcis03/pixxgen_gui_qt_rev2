@@ -154,7 +154,7 @@ class MotorPosition(threading.Thread):
         if not self.send_command:
             self.timeout = time.time()
             self.st_motor.st_motor_enable(1, True)
-            self.st_motor.st_motor_start(1, True, message['speed'], message['count'])
+            self.st_motor.st_motor_start(1, True, message['speed'], -1*message['count'])
             self.send_command = True
         
         if time.time() - self.timeout >= message['timeout']:
@@ -241,8 +241,8 @@ class MotorPosition(threading.Thread):
             self.timeout = time.time()
             self.st_motor.st_motor_enable(2, True)
             self.st_motor.st_motor_enable(3, True)
-            self.st_motor.st_motor_start(2, True, message['speed'], message['count'])
-            self.st_motor.st_motor_start(3, True, message['speed'], message['count'])
+            self.st_motor.st_motor_start(2, True, message['speed'], -1*message['count'])
+            self.st_motor.st_motor_start(3, True, message['speed'], -1*message['count'])
             self.send_command = True
         
         if time.time() - self.timeout >= message['timeout']:
@@ -284,7 +284,7 @@ class MotorPosition(threading.Thread):
         
         if not self.send_command:
             self.timeout = time.time()
-            self.dc_motor.dc_motor_start(1, True, message['speed'], message['count'], 1000)  #duty, 
+            self.dc_motor.dc_motor_start(1, True, message['speed'], -1*message['count'], 1000)  #duty, 
             self.send_command = True
         
         if time.time() - self.timeout >= message['timeout']:
