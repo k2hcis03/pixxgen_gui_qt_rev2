@@ -54,8 +54,8 @@ class MainWindow(QMainWindow, ui):
         self.command_queue = None
         self.coll_laser = 0             #레이저 다이오드 1, 2, 온 오프 플래그
         # cc = Config("./config.ini")
-        cc = Config("/home/pi/Projects/pixxgen_gui_qt/config.ini")      # For VSC
-        motor_speed = cc.get_map('motor_speed')
+        self.cc = Config("/home/pi/Projects/pixxgen_gui_qt/config.ini")      # For VSC
+        motor_speed = self.cc.get_map('motor_speed')
         self.st1_max_speed = motor_speed['ST1MAXSPEED']
         self.st1_min_speed = motor_speed['ST1MINSPEED']
         self.st2_max_speed = motor_speed['ST2MAXSPEED']
@@ -125,6 +125,8 @@ class MainWindow(QMainWindow, ui):
         self.pushButton_setting.clicked.connect(self.set_config)
         self.pushButton_mode.clicked.connect(self.set_mode)
         self.pushButton_exit.clicked.connect(self.exit_program)
+        
+        self.pushButton_total_body.clicked.connect(self.total_body_sequence)
         # 첫번째 콜리미터 위치 이동
         self.coll_motor.coll_motor_start(1, True, self.coll1_min_speed, -288*10, True)  #288 = 90도
         time.sleep(2)
@@ -160,9 +162,13 @@ class MainWindow(QMainWindow, ui):
             button.setDisabled(True)
                
     def move_motor_left_press(self, pressed):
+        #if not self.motor_poistion.command_completed(): #명령어 처리가 없으면 동작
         logging.info(f'move_motor_left pressed : {pressed}')
         print('move_motor_left pressed', pressed)
         self.motor_poistion.set_command_stop(True)  #기존 동작 강제 스톱
+        
+        self.st_motor.st_motor_enable(1, False)
+        self.st_motor.st_motor_start(1, False, 0, 0)
         
         if pressed:
             self.st_motor.st_motor_enable(1, True)
@@ -172,9 +178,13 @@ class MainWindow(QMainWindow, ui):
             self.st_motor.st_motor_start(1, False, 0, 0)
 
     def move_motor_right_press(self, pressed):
+        #if not self.motor_poistion.command_completed(): #명령어 처리가 없으면 동작
         logging.info(f'move_motor_right pressed : {pressed}')
         print('move_motor_right pressed', pressed)
         self.motor_poistion.set_command_stop(True)  #기존 동작 강제 스톱
+        
+        self.st_motor.st_motor_enable(1, False)
+        self.st_motor.st_motor_start(1, False, 0, 0)
         
         if pressed:
             self.st_motor.st_motor_enable(1, True)
@@ -242,41 +252,58 @@ class MainWindow(QMainWindow, ui):
             button_choice = f'QPushButton{{background-image: url(:/images/3_on.png)}}'
             self.pushButton_laser.setStyleSheet(button_border + button_choice)
     
-    def move_center_position(self): 
+    def move_center_position(self):   
         logging.info(f'pushButton_move_center clicked')
-        message = {
-            'position'  : 'left',
-            'speed'     : 1000,
-            'count'     : -160000000, 
-            'timeout'   : 60*1000   #1분
-        }
-        self.command_queue.put(message)
-        message = {
-            'position'  : 'right',
-            'speed'     : 1000,
-            'count'     : 12000, 
-            'timeout'   : 60   #1분
-        }
-        self.command_queue.put(message)
-        self.motor_poistion.set_command_stop(False)
+        move_center = self.cc.get_map('move_center')
+        loop = move_center['LOOP']
+        
+        for count in range(1, loop+1):
+            message = {
+                'position'  : move_center[f'POSITION{count}'],
+                'speed'     : int(move_center[f'SPEED{count}']),
+                'count'     : int(move_center[f'COUNT{count}']), 
+                'timeout'   : int(move_center[f'TIMEOUT{count}'])   #1분
+            }
+            print(message)
+            self.command_queue.put(message)
+        self.motor_poistion.set_command_stop(False)  #큐를 시작할 수 있는 조건 FALSE
         
     def move_left_position(self):
         logging.info(f'pushButton_move_left clicked')
-        message = {
-            'position'  : 'left',
-            'speed'     : 1000,
-            'count'     : -160000000, 
-            'timeout'   : 60   #1분
-        }
-        self.command_queue.put(message)
-        self.motor_poistion.set_command_stop(False)
-        # button_border = f'QPushButton{{border: none;}}'
-        # button_choice = f'QPushButton{{background-image: url(:/images/m_collimator{self.collimator_rotate}_down.png)}}'
-        # self.pushButton_select_colimator.setStyleSheet(button_border + button_choice)
+        move_left = self.cc.get_map('st_move_left')
+        loop = move_left['LOOP']
+        
+        for count in range(1, loop+1):
+            message = {
+                'position'  : move_left[f'POSITION{count}'],
+                'speed'     : int(move_left[f'SPEED{count}']),
+                'count'     : int(move_left[f'COUNT{count}']), 
+                'timeout'   : int(move_left[f'TIMEOUT{count}'])   #1분
+            }
+            print(message)
+            self.command_queue.put(message)
+        self.motor_poistion.set_command_stop(False) #큐를 시작할 수 있는 조건 FALSE
+    
+    def move_right_position(self):
+        logging.info(f'pushButton_move_right clicked')
+        move_left = self.cc.get_map('st_move_right')
+        loop = move_left['LOOP']
+        
+        for count in range(1, loop+1):
+            message = {
+                'position'  : move_left[f'POSITION{count}'],
+                'speed'     : int(move_left[f'SPEED{count}']),
+                'count'     : int(move_left[f'COUNT{count}']), 
+                'timeout'   : int(move_left[f'TIMEOUT{count}'])   #1분
+            }
+            print(message)
+            self.command_queue.put(message)
+        self.motor_poistion.set_command_stop(False) #큐를 시작할 수 있는 조건 FALSE
+         
     def set_config(self):
         logging.info('set_config clicked')
         ret = password(self)
-        config = configuration(self, self.init.gpio_i2c_parsing_data)
+        config = configuration(self, self.init.gpio_i2c_parsing_data, self.dc_motor)
         # config.setWindowModality(Qt.ApplicationModal)
         config.setWindowModality(Qt.NonModal)
         
@@ -326,7 +353,24 @@ class MainWindow(QMainWindow, ui):
             self.pushButton_motor_down.setEnabled(True)      
             self.pushButton_move_center.setEnabled(True)
             self.pushButton_move_left.setEnabled(True)
-            
+    
+    def total_body_sequence(self):
+        logging.info(f'pushButton_total_body clicked')
+        move_total_body = self.cc.get_map('move_total_body')
+        loop = move_total_body['LOOP']
+        
+        for count in range(1, loop+1):
+            message = {
+                'position'  : move_total_body[f'POSITION{count}'],
+                'speed'     : int(move_total_body[f'SPEED{count}']),
+                'count'     : int(move_total_body[f'COUNT{count}']), 
+                'timeout'   : int(move_total_body[f'TIMEOUT{count}'])   #1분
+            }
+            print(message)
+            self.command_queue.put(message)
+        self.motor_poistion.set_command_stop(False) #큐를 시작할 수 있는 조건 FALSE
+        
+          
 def main():
     app = QApplication(sys.argv)
     windows = MainWindow()

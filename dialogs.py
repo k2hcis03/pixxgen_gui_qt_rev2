@@ -59,7 +59,7 @@ class PasswordDialog(QDialog, ui_password):
             self.lineEdit_password.clear()
 
 class ConfigDialog(QDialog, ui_config, threading.Thread):
-    def __init__(self, parent, gpio_i2c_parsing_data):
+    def __init__(self, parent, gpio_i2c_parsing_data, dc_motor):
         super(ConfigDialog, self).__init__(parent)
         threading.Thread.__init__(self)
         # icon = QIcon("./asserts/bell.png")
@@ -71,18 +71,22 @@ class ConfigDialog(QDialog, ui_config, threading.Thread):
         self.thread_run = True
         self.gpio_i2c_parsing_data = gpio_i2c_parsing_data
         self.pushButton_OK.clicked.connect(self.ok_clicked)
-         
+        
+        self.dc_motor = dc_motor
+        self.pushButton_dc_motor_up.clicked.connect(self.move_dc_motor_up)
+        self.pushButton_dc_motor_down.clicked.connect(self.move_dc_motor_down)
+        
     def run(self):
         while(True):
             time.sleep(0.5)
             print('thread running')
             
-            if self.gpio_i2c_parsing_data['step1_enc1'][2]:             #left limit sensor
+            if self.gpio_i2c_parsing_data['step1_enc3'][2]:             #left limit sensor
                 self.checkBox_st1_left.setCheckState(Qt.Checked)
             else:
                 self.checkBox_st1_left.setCheckState(Qt.Unchecked)    
             
-            if self.gpio_i2c_parsing_data['step1_enc3'][2]:             #right limit sensor
+            if self.gpio_i2c_parsing_data['step1_enc1'][2]:             #right limit sensor
                 self.checkBox_st1_right.setCheckState(Qt.Checked)
             else:
                 self.checkBox_st1_right.setCheckState(Qt.Unchecked) 
@@ -130,6 +134,14 @@ class ConfigDialog(QDialog, ui_config, threading.Thread):
             if not self.thread_run:
                 break
     
+    def move_dc_motor_up(self):
+        print('move_dc_motor_up')
+        self.dc_motor.dc_motor_start(1, True, 100, -1000000, 1000)  #duty, 
+        
+    def move_dc_motor_down(self):
+        print('move_dc_motor_down')
+        self.dc_motor.dc_motor_start(1, True, 50, 1000000, 1000)  #duty, 
+        
     def ok_clicked(self):
         self.thread_run = False
         self.close()
