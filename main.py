@@ -50,7 +50,7 @@ class MainWindow(QMainWindow, ui):
         # icon = QIcon("./asserts/bell.png")
         # self.setWindowTitle('AVG Antivirus Free')
         # self.setWindowIcon(icon)
-        self.collimator_rotate = 1
+        self.collimator_rotate = 0
         # self.collimator_rotate_remote = 0
         self.setWindowFlag(Qt.FramelessWindowHint)
         self.setupUi(self)
