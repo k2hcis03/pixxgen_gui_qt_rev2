@@ -318,20 +318,22 @@ class MainWindow(QMainWindow, ui):
             print('cancel')
     
     def set_mode(self):         #모터 정지 기능 수행 그림 변경 필요
-        self.motor_poistion.set_command_stop(True)
-        # button_border = f'QPushButton{{border: none;}}'
-        # button_choice = f'QPushButton{{background-image: url(:/images/b_mode_down.png)}}'
-        self.motor_stopped = True
-        # time.sleep(0.01)
-        # 모터 스톱
-        self.st_motor.st_motor_enable(1, False)
-        self.st_motor.st_motor_start(1, False, 0, 0)
-        self.st_motor.st_motor_enable(2, False)
-        self.st_motor.st_motor_start(2, False, 0, 0)
-        self.st_motor.st_motor_enable(3, False)
-        self.st_motor.st_motor_start(3, False, 0, 0)
-        print(self.motor_stopped)
+        # self.motor_poistion.set_command_stop(True)
+        # # button_border = f'QPushButton{{border: none;}}'
+        # # button_choice = f'QPushButton{{background-image: url(:/images/b_mode_down.png)}}'
+        # self.motor_stopped = True
+        # # time.sleep(0.01)
+        # # 모터 스톱
+        # self.st_motor.st_motor_enable(1, False)
+        # self.st_motor.st_motor_start(1, False, 0, 0)
+        # self.st_motor.st_motor_enable(2, False)
+        # self.st_motor.st_motor_start(2, False, 0, 0)
+        # self.st_motor.st_motor_enable(3, False)
+        # self.st_motor.st_motor_start(3, False, 0, 0)
+        # print(self.motor_stopped)
         
+        pass    #향후, xray를 코너로 이동시키는 DC 모터 구동 필요
+    
         # self.pushButton_mode.setStyleSheet(button_border + button_choice)
     
     def exit_program(self):
