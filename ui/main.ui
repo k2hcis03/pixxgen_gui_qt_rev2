@@ -686,6 +686,38 @@ QPushButton:pressed{
      <string/>
     </property>
    </widget>
+   <widget class="QLabel" name="label">
+    <property name="geometry">
+     <rect>
+      <x>190</x>
+      <y>57</y>
+      <width>119</width>
+      <height>94</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">QLabel{
+	border:none;
+	background-image: url(:/images/4_off.png);
+}</string>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pushButton_sel_gen">
+    <property name="geometry">
+     <rect>
+      <x>460</x>
+      <y>57</y>
+      <width>94</width>
+      <height>94</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>XRAY-1</string>
+    </property>
+   </widget>
   </widget>
  </widget>
  <resources>

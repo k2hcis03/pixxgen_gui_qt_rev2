@@ -19,10 +19,14 @@ from concurrent.futures import ThreadPoolExecutor
 from dialogs import PasswordDialog as password
 from dialogs import ConfigDialog as configuration
 
+from tcpserver import TcpServerThread as tcp_server
+
 import sensor_timer
 import threading
 import queue
 import position
+import RPi.GPIO as GPIO
+
 # from PySide6 import QtWidgets
 # from PySide6.QtWidgets import QApplication, QMainWindow, QLineEdit, QDialog, QMessageBox, QWidget, QFontDialog
 # from PySide6.QtGui import QPixmap, QIcon
@@ -101,7 +105,8 @@ class MainWindow(QMainWindow, ui):
         self.command_queue = queue.Queue(maxsize=10)
         self._lock = threading.Lock()
         
-        self.motor_poistion = position.MotorPosition(self, self.command_queue, self.st_motor, self.init.gpio_i2c_parsing_data, self._lock, logging)
+        self.motor_poistion = position.MotorPosition(self, self.command_queue, self.st_motor, self.init.gpio_i2c_parsing_data, 
+                                                     self._lock, logging, self.uart_power1, self.uart_power2, self.init.dev_gpio_handle)
         self.motor_poistion.start()
         
         self.pushButton_select_colimator.clicked.connect(self.chang_collimator)
@@ -126,10 +131,20 @@ class MainWindow(QMainWindow, ui):
         self.pushButton_mode.clicked.connect(self.set_mode)
         self.pushButton_exit.clicked.connect(self.exit_program)
         
+        #  2024년 제네레이터 변경 기능 추가
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(20, GPIO.OUT)
+        GPIO.output(20, GPIO.HIGH)
+        self.pushButton_sel_gen.clicked.connect(self.select_generator)
+        #
         self.pushButton_total_body.clicked.connect(self.total_body_sequence)
         # 첫번째 콜리미터 위치 이동
         self.coll_motor.coll_motor_start(1, True, self.coll1_min_speed, -288*10, True)  #288 = 90도
         time.sleep(2)
+        
+        self.server = tcp_server(self)
+        self.server.start()         #tcp server시작
+        # self.server.serve_forever()
         
     def chang_collimator(self):        
         self.collimator_rotate += 1
@@ -309,7 +324,7 @@ class MainWindow(QMainWindow, ui):
         config.setWindowModality(Qt.NonModal)
         
         if ret.exec():
-            if ret.password == str(1234):
+            if ret.password == str(1234):           # 패스워드 확인
                 config.show()
                 config.start()
             else:
@@ -330,15 +345,41 @@ class MainWindow(QMainWindow, ui):
         # self.st_motor.st_motor_start(2, False, 0, 0)
         # self.st_motor.st_motor_enable(3, False)
         # self.st_motor.st_motor_start(3, False, 0, 0)
-        # print(self.motor_stopped)
-
-        pass    #향후, xray를 코너로 이동시키는 DC 모터 구동 필요
-    
+        # print(self.motor_stopped)        
         # self.pushButton_mode.setStyleSheet(button_border + button_choice)
-    
+        logging.info(f'pushButton_total_body clicked')
+        mode_seq = self.cc.get_map('mode_seq')
+        loop = mode_seq['LOOP']
+        
+        for count in range(1, loop+1):
+            message = {
+                'position'  : mode_seq[f'POSITION{count}'],
+                'speed'     : int(mode_seq[f'SPEED{count}']),
+                'count'     : int(mode_seq[f'COUNT{count}']), 
+                'timeout'   : int(mode_seq[f'TIMEOUT{count}'])   #1분
+            }
+            print(message)
+            self.command_queue.put(message)
+            
+        mode_seq = self.cc.get_map('xray_on')
+        # loop = mode_seq['LOOP']
+        message = {
+            'position'  : mode_seq['POSITION'],
+            'xray_num'  : int(mode_seq['XRAY_NUM']),
+            'con_pulse' : int(mode_seq['CON_PULSE']),
+            'kv'        : float(mode_seq['KV']),
+            'ma'        : float(mode_seq['MA']), 
+            'buzzer'    : int(mode_seq['BUZZER']),
+            'time'      : float(mode_seq['TIME'])   #1분
+        }
+        print(message)
+        self.command_queue.put(message)
+        self.motor_poistion.set_command_stop(False) #큐를 시작할 수 있는 조건 FALSE
+        
     def exit_program(self):
         self.timer1.thread_timer_gpio_read_stop()
         time.sleep(0.1)
+        self.server.close_socket()
         QApplication.quit()
     
     def motor_buttons_disable(self, on_off):
@@ -373,7 +414,15 @@ class MainWindow(QMainWindow, ui):
             self.command_queue.put(message)
         self.motor_poistion.set_command_stop(False) #큐를 시작할 수 있는 조건 FALSE
         
-          
+    # 20240402 제너레이터 선택 기능 추가
+    def select_generator (self):
+        if self.pushButton_sel_gen.text() == 'XRAY-2':
+            GPIO.output(20, GPIO.HIGH)
+            self.pushButton_sel_gen.setText('XRAY-1')
+        else:
+            GPIO.output(20, GPIO.LOW)
+            self.pushButton_sel_gen.setText('XRAY-2')
+        
 def main():
     app = QApplication(sys.argv)
     windows = MainWindow()

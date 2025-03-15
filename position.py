@@ -4,6 +4,9 @@ import time
 from PyQt5.QtCore import QThread
 import threading
 import queue
+import fcntl
+import user_ioctl
+import ctypes
 
 TIME_OUT = 1
 SENSOR_DETECT = 2
@@ -11,7 +14,8 @@ COUNT_REACH = 3
 FORCE_STOP = 4
 
 class MotorPosition(threading.Thread):
-    def __init__(self, parent, work_queue, st_motor, gpio_i2c_parsing_data, _lock, logging) -> None:
+    def __init__(self, parent, work_queue, st_motor, gpio_i2c_parsing_data,
+                 _lock, logging, uart_power1, uart_power2, dev_gpio_handle) -> None:
         threading.Thread.__init__(self)
         self.command_queue = work_queue
         self.st_motor = st_motor
@@ -23,6 +27,9 @@ class MotorPosition(threading.Thread):
         self.timeout = 0
         self._lock = _lock
         self.not_doing_work = False
+        self.uart_power1 = uart_power1
+        self.uart_power2 = uart_power2
+        self.dev_gpio_handle = dev_gpio_handle
         
     def run(self):
         while True:
@@ -48,6 +55,7 @@ class MotorPosition(threading.Thread):
                         self.logging.info('st_move_left_position stopped by force')
                         self.send_command = False       # 동작 완료
                         break
+                    time.sleep(0.1)
                 elif message['position'] == 'st_right':
                     completed = self.st_move_right_position(message)
                     
@@ -67,10 +75,10 @@ class MotorPosition(threading.Thread):
                         self.logging.info('st_move_right_position stopped by force')
                         self.send_command = False       # 동작 완료
                         break
-                      
+                    time.sleep(0.1)  
                 elif message['position'] == 'st_up': 
                     completed = self.st_move_up_position(message)
-                    
+                      
                     if completed == SENSOR_DETECT:
                         self.logging.info('st_move_up_position completed by sensor')
                         self.send_command = False       # 동작 완료
@@ -87,7 +95,7 @@ class MotorPosition(threading.Thread):
                         self.logging.info('st_move_up_position stopped by force')
                         self.send_command = False       # 동작 완료
                         break
-                
+                    time.sleep(0.1)
                 elif message['position'] == 'st_down': 
                     completed = self.st_move_down_position(message)
                     
@@ -107,7 +115,7 @@ class MotorPosition(threading.Thread):
                         self.logging.info('st_move_down_position stopped by force')
                         self.send_command = False       # 동작 완료
                         break    
-                
+                    time.sleep(0.1)
                 elif message['position'] == 'dc_down': 
                     completed = self.dc_move_down_position(message)
                     
@@ -127,6 +135,7 @@ class MotorPosition(threading.Thread):
                         self.logging.info('dc_move_down_position stopped by force')
                         self.send_command = False       # 동작 완료
                         break
+                    time.sleep(0.1)
                 elif message['position'] == 'dc_up': 
                     completed = self.dc_move_up_position(message)
                     
@@ -146,7 +155,12 @@ class MotorPosition(threading.Thread):
                         self.logging.info('dc_move_up_position stopped by force')
                         self.send_command = False       # 동작 완료
                         break
-                            
+                    time.sleep(0.1)
+                elif message['position'] == 'xray_on': 
+                    self.logging.info('xray_on')  
+                    completed = self.xray_on(message)
+                    self.send_command = False       # 동작 완료
+                    break;      
     def st_move_left_position(self, message) -> int:    #1을 리턴하면 위치 도착 0을 리턴하면 이동 중. 
         if self.gpio_i2c_parsing_data['step1_enc3'][2]:
             return SENSOR_DETECT
@@ -224,7 +238,7 @@ class MotorPosition(threading.Thread):
             motor2_count = int(count.readline())
             
         with open('/sys/bus/platform/drivers/pixggen_gpio/equipment/pixxgen_sys/counter3') as count:
-            motor_count = int(count.readline())
+            motor3_count = int(count.readline())
 
         if motor2_count == 0 and motor3_count == 0:
             return COUNT_REACH
@@ -255,7 +269,7 @@ class MotorPosition(threading.Thread):
             motor2_count = int(count.readline())
             
         with open('/sys/bus/platform/drivers/pixggen_gpio/equipment/pixxgen_sys/counter3') as count:
-            motor_count = int(count.readline())
+            motor3_count = int(count.readline())
 
         if motor2_count == 0 or motor3_count == 0:      # 모터 3번이 2번보다 길이가 짧으므로 OR조건으로 설정
             return COUNT_REACH
@@ -295,6 +309,126 @@ class MotorPosition(threading.Thread):
 
         return 0
     
+    def xray_on(self, message):
+        if message['xray_num'] == 1:
+            power_volt = "[XV{:04}]".format(int(float(message['kv']) * 10))
+            self.uart_power1.send_serial(power_volt, None)
+        else:
+            power_volt = "[XV{:04}]".format(int(float(message['kv']) * 10))
+            self.uart_power2.send_serial(power_volt, None)
+        time.sleep(0.02)
+        
+        if message['xray_num'] == 1:
+            power_current = "[XA{:03}]".format(int(float(message['ma'])))
+            self.uart_power1.send_serial(power_current, None)
+        else:
+            power_current = "[XA{:03}]".format(int(float(message['ma'])))
+            self.uart_power2.send_serial(power_current, None)
+        time.sleep(0.02)
+             
+        if message['xray_num'] == 1:
+            power_time = "[XT{:03}]".format(int(float(message['time']) * 10))
+            self.uart_power1.send_serial(power_time, None)
+        else:
+            power_time = "[XT{:03}]".format(int(float(message['time']) * 10))
+            self.uart_power2.send_serial(power_time, None)
+        time.sleep(0.02)
+        self.off_xray_power(message['xray_num'])
+        
+        time.sleep(0.1)
+        self.on_xray_power(message['xray_num'], message)
+        
+        
+    def on_xray_power(self, xray, message):
+        if xray == 1:
+            if message['con_pulse']:
+                continuse_or_pulse_mode = "[XMC]"
+            else:
+                continuse_or_pulse_mode = "[XMP]"    
+            
+            if message['buzzer']:
+                power_buz = "[XBON]"
+            else:
+                power_buz = "[XBOF]"
+            
+            self.uart_power1.send_serial(continuse_or_pulse_mode, None)
+            time.sleep(0.02)
+            self.uart_power1.send_serial(power_buz, None)
+            time.sleep(0.02)
+            
+            _ioctl = user_ioctl.IOCTLRequest()
+            data = user_ioctl.StructIOCTL()
+            
+            for i in range(13):
+                data.exout[i] = 0
+            data.exout[user_ioctl.XRAY1_READY] = 1
+            SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
+            fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+            time.sleep(0.2)  
+            
+            data.exout[user_ioctl.XRAY1_ON] = 1
+            SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
+            fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+        else:
+            if message['con_pulse']:
+                continuse_or_pulse_mode = "[XMC]"
+            else:
+                continuse_or_pulse_mode = "[XMP]"    
+            
+            if message['buzzer']:
+                power_buz = "[XBON]"
+            else:
+                power_buz = "[XBOF]"
+            
+            self.uart_power2.send_serial(continuse_or_pulse_mode, None)
+            time.sleep(0.02)
+            self.uart_power2.send_serial(power_buz, None)
+            time.sleep(0.02)
+            
+            _ioctl = user_ioctl.IOCTLRequest()
+            data = user_ioctl.StructIOCTL()
+            
+            for i in range(13):
+                data.exout[i] = 0
+            data.exout[user_ioctl.XRAY2_READY] = 1
+            SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
+            fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+            time.sleep(0.2)  
+            
+            data.exout[user_ioctl.XRAY2_ON] = 1
+            SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
+            fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+            
+    def off_xray_power(self, xray):
+        if xray == 1:
+            _ioctl = user_ioctl.IOCTLRequest()
+            data = user_ioctl.StructIOCTL()
+            
+            for i in range(13):
+                data.exout[i] = 0
+            data.exout[user_ioctl.XRAY1_ON] = 0
+            SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
+            fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+            time.sleep(0.5)  
+            
+            data.exout[user_ioctl.XRAY1_READY] = 0
+            SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
+            fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+        else:
+            _ioctl = user_ioctl.IOCTLRequest()
+            data = user_ioctl.StructIOCTL()
+            
+            for i in range(13):
+                data.exout[i] = 0
+            data.exout[user_ioctl.XRAY2_ON] = 0
+            SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
+            fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+            time.sleep(0.5)  
+            
+            data.exout[user_ioctl.XRAY2_READY] = 0
+            SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
+            fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+                       
     def set_command_stop(self, on_off):
         self.not_doing_work = on_off
         

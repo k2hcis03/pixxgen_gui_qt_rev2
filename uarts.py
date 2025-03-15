@@ -20,7 +20,9 @@ class Uarts(threading.Thread):
     def send_serial(self, data, status_edit):
         if self.serial.isOpen():
             self.serial.write(bytes(data, 'ascii'))
-            self.status_edit = status_edit
+            
+            if status_edit:
+                self.status_edit = status_edit
             
     def run(self):
         if self.serial.isOpen():
@@ -29,8 +31,10 @@ class Uarts(threading.Thread):
                 if read:
                     print(datetime.datetime.now(), read)
                     # if self.port == '/dev/ttyAMA2':
-                    self.status_edit.setText(str(read))
-                    # self.logging.info('port1' + str(read))
+                    if self.status_edit is not None:
+                        self.status_edit.setText(str(read))
+                    else:
+                        self.logging.info(str(read))
                     # else:
                     #     # self.builder.get_object("uart2_rx_entry").set_text(str(read))
                     #     self.logging.info('port2' + str(read))

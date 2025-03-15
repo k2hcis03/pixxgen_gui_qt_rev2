@@ -94,10 +94,10 @@ class ConfigDialog(QDialog, ui_config, threading.Thread):
         self.pushButton_xray2_sec.clicked.connect(lambda: self.set_xray_sec(2))
         
         self.pushButton_xray1_power_on.clicked.connect(lambda: self.on_xray_power(1))
-        self.pushButton_xray2_power_on.clicked.connect(lambda: self.on_xray_power(1))
+        self.pushButton_xray2_power_on.clicked.connect(lambda: self.on_xray_power(2))
         
         self.pushButton_xray1_power_off.clicked.connect(lambda: self.off_xray_power(1))
-        self.pushButton_xray2_power_off.clicked.connect(lambda: self.off_xray_power(1))
+        self.pushButton_xray2_power_off.clicked.connect(lambda: self.off_xray_power(2))
         
     def run(self):
         while(True):
@@ -176,7 +176,7 @@ class ConfigDialog(QDialog, ui_config, threading.Thread):
                 self.uart_power1.send_serial(power_volt, self.lineEdit_xray1_status)
             elif xray == 2:
                 power_volt = "[XV{:04}]".format(int(float(self.lineEdit_xray2_kv.text()) * 10))
-                self.uart_power1.send_serial(power_volt, self.lineEdit_xray2_status)
+                self.uart_power2.send_serial(power_volt, self.lineEdit_xray2_status)
         except ValueError as e:
             print('check value')
             
@@ -187,7 +187,7 @@ class ConfigDialog(QDialog, ui_config, threading.Thread):
                 self.uart_power1.send_serial(power_current, self.lineEdit_xray1_status)
             elif xray == 2:
                 power_current = "[XA{:03}]".format(int(float(self.lineEdit_xray2_ma.text())))
-                self.uart_power1.send_serial(power_current, self.lineEdit_xray2_status)
+                self.uart_power2.send_serial(power_current, self.lineEdit_xray2_status)
         except ValueError as e:
             print('check value')
                        
@@ -198,7 +198,7 @@ class ConfigDialog(QDialog, ui_config, threading.Thread):
                 self.uart_power1.send_serial(power_time, self.lineEdit_xray1_status)
             elif xray == 2:
                 power_time = "[XT{:03}]".format(int(float(self.lineEdit_xray2_time.text()) * 10))
-                self.uart_power1.send_serial(power_time, self.lineEdit_xray2_status)
+                self.uart_power2.send_serial(power_time, self.lineEdit_xray2_status)
         except ValueError as e:
             print('check value')
             
@@ -262,7 +262,7 @@ class ConfigDialog(QDialog, ui_config, threading.Thread):
             SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
             fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
             
-    def onff_xray_power(self, xray):
+    def off_xray_power(self, xray):
         if xray == 1:
             _ioctl = user_ioctl.IOCTLRequest()
             data = user_ioctl.StructIOCTL()
