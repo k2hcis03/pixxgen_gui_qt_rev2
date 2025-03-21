@@ -40,6 +40,55 @@ class TcpServerThread(threading.Thread):
         
 class JsonTCPHandler(socketserver.BaseRequestHandler):
     "One instance per connection.  Override handle(self) to customize action."
+    
+    def extract_json_from_http(self, data):
+        """HTTP 요청에서 JSON 데이터를 추출합니다.
+
+        Args:
+            data (str): HTTP 요청 문자열
+
+        Returns:
+            tuple: (is_http, json_data)
+                - is_http: HTTP 요청 여부
+                - json_data: JSON 데이터 문자열 또는 None
+        """
+        try:
+            # HTTP 요청인지 확인
+            if data.startswith('POST') or data.startswith('GET'):
+                # 헤더와 본문 분리
+                parts = data.split('\r\n\r\n', 1)
+                if len(parts) == 2:
+                    return True, parts[1].strip()
+            return False, data
+        except Exception as e:
+            print(f'HTTP 파싱 오류: {str(e)}')
+            return False, None
+    
+    def send_response(self, data, is_http=False):
+        """JSON 응답을 전송합니다.
+
+        Args:
+            data (dict): 전송할 JSON 데이터
+            is_http (bool): HTTP 응답 헤더 포함 여부
+        """
+        try:
+            json_response = json.dumps(data, ensure_ascii=False)
+            
+            if is_http:
+                response = f"HTTP/1.1 200 OK\r\n"
+                response += f"Content-Type: application/json; charset=utf-8\r\n"
+                response += f"Content-Length: {len(json_response.encode('utf-8'))}\r\n"
+                response += f"Access-Control-Allow-Origin: *\r\n"  # CORS 지원
+                response += f"Connection: close\r\n"
+                response += f"\r\n"
+                response += json_response
+            else:
+                response = json_response
+                
+            self.request.send(response.encode('utf-8'))
+        except Exception as e:
+            print(f'응답 전송 오류: {str(e)}')
+    
     def handle(self):
         global main_windows
         print(f'클라이언트가 접속했습니다:{self.client_address[0]}.')
@@ -54,13 +103,21 @@ class JsonTCPHandler(socketserver.BaseRequestHandler):
                 text = data.decode('utf-8')
                 if not text.strip():  # 빈 데이터 체크
                     continue
+                
+                # HTTP 요청에서 JSON 데이터 추출
+                is_http, json_text = self.extract_json_from_http(text)
+                if not json_text:
+                    error_response = {'status': 'error', 'message': 'No valid JSON data found'}
+                    self.send_response(error_response, is_http)
+                    continue
                     
                 try:
-                    json_data = json.loads(text)
+                    json_data = json.loads(json_text)
                     pprint(json_data)
                     
                     # JSON 응답 전송
-                    self.request.send(bytes(json.dumps(json_data), 'UTF-8'))
+                    response = {'status': 'success', 'data': json_data}
+                    self.send_response(response, is_http)
                     
                     # 커맨드 처리
                     if json_data.get('command') == 'xray-onoff':
@@ -69,7 +126,7 @@ class JsonTCPHandler(socketserver.BaseRequestHandler):
                 except json.JSONDecodeError as e:
                     print(f'JSON 파싱 오류: {str(e)}')
                     error_response = {'status': 'error', 'message': 'Invalid JSON format'}
-                    self.request.send(bytes(json.dumps(error_response), 'UTF-8'))
+                    self.send_response(error_response, is_http)
                     
             except ConnectionError as e:
                 print(f'연결 오류: {str(e)}')
