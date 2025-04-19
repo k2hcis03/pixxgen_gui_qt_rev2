@@ -122,7 +122,14 @@ class JsonTCPHandler(socketserver.BaseRequestHandler):
                     # 커맨드 처리
                     if json_data.get('command') == 'xray-onoff':
                         self.on_xray_power(json_data)
-                        
+                    elif json_data.get('command') == 'SetReady':
+                        self.xray_set_ready(json_data)
+                    elif json_data.get('command') == 'StartXRAY':
+                        self.xray_start(json_data)
+                    elif json_data.get('command') == 'StopXRAY':
+                        self.xray_stop(json_data)
+                    elif json_data.get('command') == 'GetStatus':
+                        self.xray_get_status(json_data)    
                 except json.JSONDecodeError as e:
                     print(f'JSON 파싱 오류: {str(e)}')
                     error_response = {'status': 'error', 'message': 'Invalid JSON format'}
@@ -139,6 +146,74 @@ class JsonTCPHandler(socketserver.BaseRequestHandler):
     
     def close_socket(self):
         self.request.close()
+    
+    def xray_set_ready(self, text):
+        lineEdit_xray_status = ""
+        
+        #if text['param']['is_continue']:
+        #    continuse_or_pulse_mode = "[XMC]"
+        #else:
+        continuse_or_pulse_mode = "[XMP]"    
+        
+        #if text['param']['is_buzzer']:
+        power_buz = "[XBON]"
+        #else:#
+        #    power_buz = "[XBOF]"
+        
+        self.uart_power1.send_serial(continuse_or_pulse_mode, lineEdit_xray_status)
+        time.sleep(0.01)
+        self.uart_power1.send_serial(power_buz, lineEdit_xray_status)
+        time.sleep(0.01)
+        
+        # if text['xray'] == 1:
+        power_volt = "[XV{:04}]".format(int(float(text['param']['kv']) * 10))
+        self.uart_power1.send_serial(power_volt, lineEdit_xray_status)
+        time.sleep(0.01)
+        power_current = "[XA{:03}]".format(int(float(text['param']['ma'])))
+        self.uart_power1.send_serial(power_current, lineEdit_xray_status)
+        time.sleep(0.01)
+        power_time = "[XT{:03}]".format(int(float(text['param']['sec']) * 10))
+        self.uart_power1.send_serial(power_time, lineEdit_xray_status)
+        time.sleep(0.01)
+        _ioctl = user_ioctl.IOCTLRequest()
+        data = user_ioctl.StructIOCTL()
+        
+        for i in range(13):
+            data.exout[i] = 0
+        data.exout[user_ioctl.XRAY1_READY] = 1
+        SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
+        fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+        time.sleep(0.2)
+        
+        print(lineEdit_xray_status)
+
+    def xray_start(self, text):
+        _ioctl = user_ioctl.IOCTLRequest()
+        data = user_ioctl.StructIOCTL()
+        
+        for i in range(13):
+            data.exout[i] = 0
+        data.exout[user_ioctl.XRAY1_ON] = 1
+        SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
+        fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+    
+    def xray_stop(self, text):
+        _ioctl = user_ioctl.IOCTLRequest()
+        data = user_ioctl.StructIOCTL()
+        
+        for i in range(13):
+            data.exout[i] = 0
+        data.exout[user_ioctl.XRAY1_ON] = 0
+        SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
+        fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+        time.sleep(0.5)  
+        
+        data.exout[user_ioctl.XRAY1_READY] = 0
+        SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
+        fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+    
+    def xray_get_status(self, text):
+        pass
     
     def on_xray_power(self, text):
         if text['onoff'] == 'on':
