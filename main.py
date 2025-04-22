@@ -51,6 +51,7 @@ class MainWindow(QMainWindow, ui):
         # self.setWindowTitle('AVG Antivirus Free')
         # self.setWindowIcon(icon)
         self.collimator_rotate = 1
+        # self.collimator_rotate_remote = 0
         self.setWindowFlag(Qt.FramelessWindowHint)
         self.setupUi(self)
         
@@ -148,7 +149,7 @@ class MainWindow(QMainWindow, ui):
         
     def chang_collimator(self):        
         self.collimator_rotate += 1
-        self.collimator_rotate %= 5
+        self.collimator_rotate %= 4
 
         print(self.collimator_rotate)
         if self.collimator_rotate == 0:
@@ -156,7 +157,7 @@ class MainWindow(QMainWindow, ui):
             self.enable_button(self.pushButton_select_colimator, False)
             self.coll_motor.coll_motor_start(1, True, self.coll1_min_speed, -288*10, True)  #288 = 90도
             time.sleep(2)
-            self.collimator_rotate = 1
+            self.collimator_rotate = 0
             self.enable_button(self.pushButton_select_colimator, True)
         # 다음 콜리미터 위치 이동
         else:
@@ -166,9 +167,34 @@ class MainWindow(QMainWindow, ui):
             self.enable_button(self.pushButton_select_colimator, True)
             
         button_border = f'QPushButton{{border: none;}}'
-        button_choice = f'QPushButton{{background-image: url(:/images/m_collimator{self.collimator_rotate}_down.png)}}'
+        button_choice = f'QPushButton{{background-image: url(:/images/m_collimator{self.collimator_rotate+1}_down.png)}}'
         self.pushButton_select_colimator.setStyleSheet(button_border + button_choice)
         logging.info(f'chang_collimator clicked : {self.collimator_rotate}')
+
+    def chang_collimator_remote(self, rotate):        
+        print(rotate)
+        if rotate == 0:
+            # 콜리미터 모터 초기 위치 설정
+            self.enable_button(self.pushButton_select_colimator, False)
+            self.coll_motor.coll_motor_start(1, True, self.coll1_max_speed, -288*10, True)  #288 = 90도
+            time.sleep(1)
+            self.collimator_rotate = 0
+            self.enable_button(self.pushButton_select_colimator, True)
+        # 다음 콜리미터 위치 이동
+        else:
+            diff = rotate - self.collimator_rotate
+            self.enable_button(self.pushButton_select_colimator, False)
+
+            if diff != 0:
+                self.coll_motor.coll_motor_start(1, True, self.coll1_max_speed, 288*diff, False)  #288 = 90도
+                self.collimator_rotate = rotate
+            time.sleep(1)
+            self.enable_button(self.pushButton_select_colimator, True)
+            
+        button_border = f'QPushButton{{border: none;}}'
+        button_choice = f'QPushButton{{background-image: url(:/images/m_collimator{self.collimator_rotate+1}_down.png)}}'
+        self.pushButton_select_colimator.setStyleSheet(button_border + button_choice)
+        logging.info(f'chang_collimator clicked : {rotate}')
     
     def enable_button(self, button, enable):
         if enable:

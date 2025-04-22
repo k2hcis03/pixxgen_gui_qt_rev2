@@ -18,6 +18,19 @@ HOST = '192.168.100.120'
 PORT = 9527
 
 main_window = None
+uart_power1 = None
+uart_power2 = None
+dev_gpio_handle = None
+xray_time = 0
+
+class JsonServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    # Ctrl-C will cleanly kill all spawned threads
+    daemon_threads = True
+    # much faster rebinding
+    allow_reuse_address = True
+
+    def __init__(self, server_address, RequestHandlerClass):
+        socketserver.TCPServer.__init__(self, server_address, RequestHandlerClass)
 
 class TcpServerThread(threading.Thread):
     def __init__(self, main_win):
@@ -26,6 +39,15 @@ class TcpServerThread(threading.Thread):
         
         global main_window
         main_window = main_win
+        
+        # UART 객체들을 전역 변수로 설정
+        global uart_power1, uart_power2
+        uart_power1 = main_win.uart_power1
+        uart_power2 = main_win.uart_power2
+        
+        # GPIO 핸들도 전역 변수로 설정
+        global dev_gpio_handle
+        dev_gpio_handle = main_win.init.dev_gpio_handle
         
     def run(self):
         self.server = JsonServer((HOST, PORT), JsonTCPHandler)    #JSON TCP Server
@@ -40,6 +62,13 @@ class TcpServerThread(threading.Thread):
         
 class JsonTCPHandler(socketserver.BaseRequestHandler):
     "One instance per connection.  Override handle(self) to customize action."
+    
+    def __init__(self, request, client_address, server):
+        # UART 객체들을 인스턴스 변수로 설정
+        self.uart_power1 = uart_power1
+        self.uart_power2 = uart_power2
+        self.dev_gpio_handle = dev_gpio_handle
+        super().__init__(request, client_address, server)
     
     def extract_json_from_http(self, data):
         """HTTP 요청에서 JSON 데이터를 추출합니다.
@@ -150,22 +179,15 @@ class JsonTCPHandler(socketserver.BaseRequestHandler):
     def xray_set_ready(self, text):
         lineEdit_xray_status = ""
         
-        #if text['param']['is_continue']:
-        #    continuse_or_pulse_mode = "[XMC]"
-        #else:
-        continuse_or_pulse_mode = "[XMP]"    
         
-        #if text['param']['is_buzzer']:
+        continuse_or_pulse_mode = "[XMC]"    
         power_buz = "[XBON]"
-        #else:#
-        #    power_buz = "[XBOF]"
         
         self.uart_power1.send_serial(continuse_or_pulse_mode, lineEdit_xray_status)
         time.sleep(0.01)
         self.uart_power1.send_serial(power_buz, lineEdit_xray_status)
         time.sleep(0.01)
         
-        # if text['xray'] == 1:
         power_volt = "[XV{:04}]".format(int(float(text['param']['kv']) * 10))
         self.uart_power1.send_serial(power_volt, lineEdit_xray_status)
         time.sleep(0.01)
@@ -174,7 +196,11 @@ class JsonTCPHandler(socketserver.BaseRequestHandler):
         time.sleep(0.01)
         power_time = "[XT{:03}]".format(int(float(text['param']['sec']) * 10))
         self.uart_power1.send_serial(power_time, lineEdit_xray_status)
+        
+        global xray_time
+        xray_time = int(float(text['param']['sec']))
         time.sleep(0.01)
+        
         _ioctl = user_ioctl.IOCTLRequest()
         data = user_ioctl.StructIOCTL()
         
@@ -183,20 +209,31 @@ class JsonTCPHandler(socketserver.BaseRequestHandler):
         data.exout[user_ioctl.XRAY1_READY] = 1
         SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
         fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
-        time.sleep(0.2)
         
+        colimeter = text['param']['cb']
+        main_window.chang_collimator_remote(colimeter)
         print(lineEdit_xray_status)
 
     def xray_start(self, text):
         _ioctl = user_ioctl.IOCTLRequest()
         data = user_ioctl.StructIOCTL()
+        lineEdit_xray_status = ""
         
         for i in range(13):
             data.exout[i] = 0
+        data.exout[user_ioctl.XRAY1_READY] = 1
+        SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
+        fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+        time.sleep(0.2)  
+        
         data.exout[user_ioctl.XRAY1_ON] = 1
         SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
         fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
-    
+        time.sleep(0.2)
+        
+        # 타이머 시작 (예: self.power_time 초 후에 X-ray 중지)
+        self.simple_timer(xray_time+0.5)
+
     def xray_stop(self, text):
         _ioctl = user_ioctl.IOCTLRequest()
         data = user_ioctl.StructIOCTL()
@@ -230,9 +267,9 @@ class JsonTCPHandler(socketserver.BaseRequestHandler):
                 else:
                     power_buz = "[XBOF]"
                 
-                main_window.uart_power1.send_serial(continuse_or_pulse_mode, None)
+                self.uart_power1.send_serial(continuse_or_pulse_mode, None)
                 time.sleep(0.01)
-                main_window.uart_power1.send_serial(power_buz, None)
+                self.uart_power1.send_serial(power_buz, None)
                 time.sleep(0.01)
                 
                 _ioctl = user_ioctl.IOCTLRequest()
@@ -242,12 +279,12 @@ class JsonTCPHandler(socketserver.BaseRequestHandler):
                     data.exout[i] = 0
                 data.exout[user_ioctl.XRAY1_READY] = 1
                 SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
-                fcntl.ioctl(main_window.init.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+                fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
                 time.sleep(0.2)  
                 
                 data.exout[user_ioctl.XRAY1_ON] = 1
                 SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
-                fcntl.ioctl(main_window.init.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+                fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
             else:
                 if text['continue'] == 'on':
                     continuse_or_pulse_mode = "[XMC]"
@@ -259,9 +296,9 @@ class JsonTCPHandler(socketserver.BaseRequestHandler):
                 else:
                     power_buz = "[XBOF]"
                 
-                main_window.uart_power2.send_serial(continuse_or_pulse_mode, None)
+                self.uart_power2.send_serial(continuse_or_pulse_mode, None)
                 time.sleep(0.01)
-                main_window.uart_power2.send_serial(power_buz, None)
+                self.uart_power2.send_serial(power_buz, None)
                 time.sleep(0.01)
                 
                 _ioctl = user_ioctl.IOCTLRequest()
@@ -271,12 +308,12 @@ class JsonTCPHandler(socketserver.BaseRequestHandler):
                     data.exout[i] = 0
                 data.exout[user_ioctl.XRAY2_READY] = 1
                 SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
-                fcntl.ioctl(main_window.init.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+                fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
                 time.sleep(0.2)  
                 
                 data.exout[user_ioctl.XRAY2_ON] = 1
                 SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
-                fcntl.ioctl(main_window.init.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+                fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
         else:
             print(f'onff_xray_power{text["sel"]}')
             if text['sel'] == '1':
@@ -287,12 +324,12 @@ class JsonTCPHandler(socketserver.BaseRequestHandler):
                     data.exout[i] = 0
                 data.exout[user_ioctl.XRAY1_ON] = 0
                 SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
-                fcntl.ioctl(main_window.init.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+                fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
                 time.sleep(0.5)  
                 
                 data.exout[user_ioctl.XRAY1_READY] = 0
                 SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
-                fcntl.ioctl(main_window.init.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+                fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
             else:
                 _ioctl = user_ioctl.IOCTLRequest()
                 data = user_ioctl.StructIOCTL()
@@ -301,21 +338,28 @@ class JsonTCPHandler(socketserver.BaseRequestHandler):
                     data.exout[i] = 0
                 data.exout[user_ioctl.XRAY2_ON] = 0
                 SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
-                fcntl.ioctl(main_window.init.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+                fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
                 time.sleep(0.5)  
                 
                 data.exout[user_ioctl.XRAY2_READY] = 0
                 SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
-                fcntl.ioctl(main_window.init.dev_gpio_handle['dev_gpio'], SET_DATA, data)    
+                fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)    
+    
+    def simple_timer(self, seconds):
+        """지정된 시간 후에 한 번만 실행되는 타이머
+        
+        Args:
+            seconds (int): 타이머 시간 (초)
+        """
+        def timer_job():
+            time.sleep(seconds)
+            print(f"{seconds}초 타이머 완료!")
+            self.xray_stop({"command": "StopXRAY"})
+            
+        timer_thread = threading.Thread(target=timer_job)
+        timer_thread.daemon = True
+        timer_thread.start()
 
 
-class JsonServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
-    # Ctrl-C will cleanly kill all spawned threads
-    daemon_threads = True
-    # much faster rebinding
-    allow_reuse_address = True
-
-    def __init__(self, server_address, RequestHandlerClass):
-        socketserver.TCPServer.__init__(self, server_address, RequestHandlerClass)
 
         
