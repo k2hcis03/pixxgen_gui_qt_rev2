@@ -83,4 +83,4 @@ python jsonclient.py --host 192.168.100.120 --port 9527 --sel 1 --onoff 1
 ## 문의
 
 기술 지원 및 문의사항은 아래 연락처로 문의해주세요:
-- Email: k2h@cis.co.kr 
+- Email: k2hcis03@gmail.com 
