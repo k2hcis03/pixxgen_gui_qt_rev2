@@ -20,6 +20,7 @@ from dialogs import PasswordDialog as password
 from dialogs import ConfigDialog as configuration
 
 from tcpserver import TcpServerThread as tcp_server
+import tcpserver
 
 import sensor_timer
 import threading
@@ -107,7 +108,7 @@ class MainWindow(QMainWindow, ui):
         self._lock = threading.Lock()
         
         self.motor_poistion = position.MotorPosition(self, self.command_queue, self.st_motor, self.init.gpio_i2c_parsing_data, 
-                                                     self._lock, logging, self.uart_power1, self.uart_power2, self.init.dev_gpio_handle)
+                                                     self._lock, logging, self.uart_power1, self.uart_power2, self.init.dev_gpio_handle, self.dc_motor)
         self.motor_poistion.start()
         
         self.pushButton_select_colimator.clicked.connect(self.chang_collimator)
@@ -132,6 +133,8 @@ class MainWindow(QMainWindow, ui):
         self.pushButton_mode.clicked.connect(self.set_mode)
         self.pushButton_exit.clicked.connect(self.exit_program)
         
+        self.pushButton_lateral.pressed.connect(lambda: self.lateral_position(1))
+        self.pushButton_lateral.released.connect(lambda: self.lateral_position(0))
         #  2024년 제네레이터 변경 기능 추가
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(20, GPIO.OUT)
@@ -237,40 +240,44 @@ class MainWindow(QMainWindow, ui):
     def move_motor_up_press(self, pressed):
         logging.info(f'move_motor_up pressed : {pressed}')
         print('move_motor_up_press pressed', pressed)
-        self.motor_poistion.set_command_stop(True)  #기존 동작 강제 스톱
         
-        self.st_motor.st_motor_enable(1, False)
-        self.st_motor.st_motor_start(1, False, 0, 0)
+        if self.init.gpio_i2c_parsing_data['dc1_enc2'][2] == 0:
+            self.motor_poistion.set_command_stop(True)  #기존 동작 강제 스톱
             
-        if pressed:
-            self.st_motor.st_motor_enable(2, True)
-            self.st_motor.st_motor_enable(3, True)
-            self.st_motor.st_motor_start(2, True, self.st2_max_speed, 160000000)
-            self.st_motor.st_motor_start(3, True, self.st3_max_speed, 160000000)
-        else:
-            self.st_motor.st_motor_enable(2, False)
-            self.st_motor.st_motor_enable(3, False)
-            self.st_motor.st_motor_start(2, False, 0, 0)
-            self.st_motor.st_motor_start(3, False, 0, 0)
+            self.st_motor.st_motor_enable(1, False)
+            self.st_motor.st_motor_start(1, False, 0, 0)
+                
+            if pressed:
+                self.st_motor.st_motor_enable(2, True)
+                self.st_motor.st_motor_enable(3, True)
+                self.st_motor.st_motor_start(2, True, self.st2_max_speed, 160000000)
+                self.st_motor.st_motor_start(3, True, self.st3_max_speed, 160000000)
+            else:
+                self.st_motor.st_motor_enable(2, False)
+                self.st_motor.st_motor_enable(3, False)
+                self.st_motor.st_motor_start(2, False, 0, 0)
+                self.st_motor.st_motor_start(3, False, 0, 0)
             
     def move_motor_down_press(self, pressed):
         logging.info(f'move_motor_down pressed : {pressed}')
         print('move_motor_down_press pressed', pressed)
-        self.motor_poistion.set_command_stop(True)  #기존 동작 강제 스톱
-        
-        self.st_motor.st_motor_enable(1, False)
-        self.st_motor.st_motor_start(1, False, 0, 0)
-        
-        if pressed:
-            self.st_motor.st_motor_enable(2, True)
-            self.st_motor.st_motor_enable(3, True)
-            self.st_motor.st_motor_start(2, True, self.st2_max_speed, -160000000)
-            self.st_motor.st_motor_start(3, True, self.st3_max_speed, -160000000)
-        else:
-            self.st_motor.st_motor_enable(2, False)
-            self.st_motor.st_motor_enable(3, False)
-            self.st_motor.st_motor_start(2, False, 0, 0)
-            self.st_motor.st_motor_start(3, False, 0, 0)
+
+        if self.init.gpio_i2c_parsing_data['dc1_enc2'][2] == 0:
+            self.motor_poistion.set_command_stop(True)  #기존 동작 강제 스톱
+            
+            self.st_motor.st_motor_enable(1, False)
+            self.st_motor.st_motor_start(1, False, 0, 0)
+            
+            if pressed:
+                self.st_motor.st_motor_enable(2, True)
+                self.st_motor.st_motor_enable(3, True)
+                self.st_motor.st_motor_start(2, True, self.st2_max_speed, -160000000)
+                self.st_motor.st_motor_start(3, True, self.st3_max_speed, -160000000)
+            else:
+                self.st_motor.st_motor_enable(2, False)
+                self.st_motor.st_motor_enable(3, False)
+                self.st_motor.st_motor_start(2, False, 0, 0)
+                self.st_motor.st_motor_start(3, False, 0, 0)
 
     def on_off_laser(self):
         logging.info(f'pushButton_laser clicked : {self.toggle_laser}')
@@ -308,7 +315,22 @@ class MainWindow(QMainWindow, ui):
             print(message)
             self.command_queue.put(message)
         self.motor_poistion.set_command_stop(False)  #큐를 시작할 수 있는 조건 FALSE
+    
+    def lateral_position(self, pressed):   
+        logging.info(f'pushButton_lateral_position clicked')
+        self.st_motor.st_motor_enable(1, False)
+        self.st_motor.st_motor_start(1, False, 0, 0)
         
+        if pressed:
+            self.st_motor.st_motor_enable(2, True)
+            self.st_motor.st_motor_start(2, True, self.st3_max_speed, -160000000)
+        else:
+            self.st_motor.st_motor_enable(2, False)
+            self.st_motor.st_motor_start(2, False, 0, 0)
+
+
+        self.motor_poistion.set_command_stop(False)  #큐를 시작할 수 있는 조건 FALSE 
+    
     def move_left_position(self):
         logging.info(f'pushButton_move_left clicked')
         move_left = self.cc.get_map('st_move_left')

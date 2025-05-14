@@ -13,6 +13,9 @@ from pprint import pprint
 import fcntl
 import user_ioctl
 import ctypes
+import socket
+import RPi.GPIO as GPIO
+import datetime
 
 HOST = '192.168.100.120'
 PORT = 9527
@@ -22,6 +25,18 @@ uart_power1 = None
 uart_power2 = None
 dev_gpio_handle = None
 xray_time = 0
+
+xray1_uart_response = None
+xray2_uart_response = None
+
+motor1_is_stop = True
+motor2_is_stop = True   
+motor3_is_stop = True
+dc_motor_is_stop = True
+motor_x = 0
+motor_y = 0
+dc_motor_up = False
+count_clock = 0
 
 class JsonServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     # Ctrl-C will cleanly kill all spawned threads
@@ -37,9 +52,9 @@ class TcpServerThread(threading.Thread):
         threading.Thread.__init__(self)
         self.daemon = True
         
-        global main_window
+        global main_window, dc_motor_up
         main_window = main_win
-        
+        dc_motor_up = main_win.motor_poistion.get_stand_status()
         # UART 객체들을 전역 변수로 설정
         global uart_power1, uart_power2
         uart_power1 = main_win.uart_power1
@@ -119,7 +134,6 @@ class JsonTCPHandler(socketserver.BaseRequestHandler):
             print(f'응답 전송 오류: {str(e)}')
     
     def handle(self):
-        global main_windows
         print(f'클라이언트가 접속했습니다:{self.client_address[0]}.')
         while True:
             try:
@@ -145,8 +159,9 @@ class JsonTCPHandler(socketserver.BaseRequestHandler):
                     pprint(json_data)
                     
                     # JSON 응답 전송
-                    response = {'status': 'success', 'data': json_data}
-                    self.send_response(response, is_http)
+                    if json_data.get('command') !='GetStatus':
+                        response = {'status': 'success', 'data': json_data}
+                        self.send_response(response, is_http)
                     
                     # 커맨드 처리
                     if json_data.get('command') == 'xray-onoff':
@@ -158,7 +173,11 @@ class JsonTCPHandler(socketserver.BaseRequestHandler):
                     elif json_data.get('command') == 'StopXRAY':
                         self.xray_stop(json_data)
                     elif json_data.get('command') == 'GetStatus':
-                        self.xray_get_status(json_data)    
+                        self.xray_get_status(json_data, is_http)   
+                    elif json_data.get('command') == 'Move':
+                        self.system_move(json_data)
+                    elif json_data.get('command') == 'Stand':
+                        self.detector_stand(json_data)
                 except json.JSONDecodeError as e:
                     print(f'JSON 파싱 오류: {str(e)}')
                     error_response = {'status': 'error', 'message': 'Invalid JSON format'}
@@ -177,42 +196,88 @@ class JsonTCPHandler(socketserver.BaseRequestHandler):
         self.request.close()
     
     def xray_set_ready(self, text):
+        self.xray_stop(text)
+
         lineEdit_xray_status = ""
-        
-        
-        continuse_or_pulse_mode = "[XMC]"    
-        power_buz = "[XBON]"
-        
-        self.uart_power1.send_serial(continuse_or_pulse_mode, lineEdit_xray_status)
-        time.sleep(0.01)
-        self.uart_power1.send_serial(power_buz, lineEdit_xray_status)
-        time.sleep(0.01)
-        
-        power_volt = "[XV{:04}]".format(int(float(text['param']['kv']) * 10))
-        self.uart_power1.send_serial(power_volt, lineEdit_xray_status)
-        time.sleep(0.01)
-        power_current = "[XA{:03}]".format(int(float(text['param']['ma'])))
-        self.uart_power1.send_serial(power_current, lineEdit_xray_status)
-        time.sleep(0.01)
-        power_time = "[XT{:03}]".format(int(float(text['param']['sec']) * 10))
-        self.uart_power1.send_serial(power_time, lineEdit_xray_status)
-        
+        continuse_or_pulse_mode = "[XMC]"   
+
         global xray_time
-        xray_time = int(float(text['param']['sec']))
-        time.sleep(0.01)
+        self.xray_stop({"command": "StopXRAY",
+            "param":{
+                "xray": 1
+            }
+            })
+        self.xray_stop({"command": "StopXRAY",
+            "param":{
+                "xray": 2
+            }
+            })
         
-        _ioctl = user_ioctl.IOCTLRequest()
-        data = user_ioctl.StructIOCTL()
+        if text['param']['bp'] == 1:
+            power_buz = "[XBON]"
+        else:
+            power_buz = "[XBOF]"
         
-        for i in range(13):
-            data.exout[i] = 0
-        data.exout[user_ioctl.XRAY1_READY] = 1
-        SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
-        fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+        if text['param']['xray'] == 1:
+            GPIO.output(20, GPIO.HIGH)
+            time.sleep(0.05)
+            self.uart_power1.send_serial(continuse_or_pulse_mode, lineEdit_xray_status)
+            time.sleep(0.01)
+            self.uart_power1.send_serial(power_buz, lineEdit_xray_status)
+            time.sleep(0.01)
         
-        colimeter = text['param']['cb']
-        main_window.chang_collimator_remote(colimeter)
-        print(lineEdit_xray_status)
+            power_volt = "[XV{:04}]".format(int(float(text['param']['kv']) * 10))
+            self.uart_power1.send_serial(power_volt, lineEdit_xray_status)
+            time.sleep(0.01)
+            power_current = "[XA{:03}]".format(int(float(text['param']['ma'])))
+            self.uart_power1.send_serial(power_current, lineEdit_xray_status)
+            time.sleep(0.01)
+            power_time = "[XT{:03}]".format(int(float(text['param']['sec']) * 10))
+            self.uart_power1.send_serial(power_time, lineEdit_xray_status)
+            
+            xray_time = int(float(text['param']['sec']))
+            time.sleep(0.01)
+            
+            _ioctl = user_ioctl.IOCTLRequest()
+            data = user_ioctl.StructIOCTL()
+            
+            for i in range(13):
+                data.exout[i] = 0
+            data.exout[user_ioctl.XRAY1_READY] = 1
+            SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
+            fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+            
+            colimeter = text['param']['cb']
+            main_window.chang_collimator_remote(colimeter)
+            print(lineEdit_xray_status)
+        elif text['param']['xray'] == 2:
+            GPIO.output(20, GPIO.LOW)
+            time.sleep(0.05)
+            self.uart_power2.send_serial(continuse_or_pulse_mode, lineEdit_xray_status)
+            time.sleep(0.01)
+            self.uart_power2.send_serial(power_buz, lineEdit_xray_status)
+            time.sleep(0.01)
+        
+            power_volt = "[XV{:04}]".format(int(float(text['param']['kv']) * 10))
+            self.uart_power2.send_serial(power_volt, lineEdit_xray_status)
+            time.sleep(0.01)
+            power_current = "[XA{:03}]".format(int(float(text['param']['ma'])))
+            self.uart_power2.send_serial(power_current, lineEdit_xray_status)
+            time.sleep(0.01)
+            power_time = "[XT{:03}]".format(int(float(text['param']['sec']) * 10))
+            self.uart_power2.send_serial(power_time, lineEdit_xray_status)
+            
+            xray_time = int(float(text['param']['sec']))
+            time.sleep(0.01)
+            
+            _ioctl = user_ioctl.IOCTLRequest()
+            data = user_ioctl.StructIOCTL()
+            
+            for i in range(13):
+                data.exout[i] = 0
+            data.exout[user_ioctl.XRAY2_READY] = 1
+            SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
+            fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
 
     def xray_start(self, text):
         _ioctl = user_ioctl.IOCTLRequest()
@@ -221,15 +286,27 @@ class JsonTCPHandler(socketserver.BaseRequestHandler):
         
         for i in range(13):
             data.exout[i] = 0
-        data.exout[user_ioctl.XRAY1_READY] = 1
-        SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
-        fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
-        time.sleep(0.2)  
         
-        data.exout[user_ioctl.XRAY1_ON] = 1
-        SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
-        fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
-        time.sleep(0.2)
+        if text['param']['xray'] == 1:
+            data.exout[user_ioctl.XRAY1_READY] = 1
+            SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
+            fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+            time.sleep(0.2)  
+            
+            data.exout[user_ioctl.XRAY1_ON] = 1
+            SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
+            fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+            time.sleep(0.2)
+        elif text['param']['xray'] == 2:
+            data.exout[user_ioctl.XRAY2_READY] = 1
+            SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
+            fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+            time.sleep(0.2)  
+            
+            data.exout[user_ioctl.XRAY2_ON] = 1
+            SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
+            fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+            time.sleep(0.2)
         
         # 타이머 시작 (예: self.power_time 초 후에 X-ray 중지)
         self.simple_timer(xray_time+0.5)
@@ -240,18 +317,229 @@ class JsonTCPHandler(socketserver.BaseRequestHandler):
         
         for i in range(13):
             data.exout[i] = 0
-        data.exout[user_ioctl.XRAY1_ON] = 0
-        SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
-        fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
-        time.sleep(0.5)  
         
-        data.exout[user_ioctl.XRAY1_READY] = 0
-        SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
-        fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
-    
-    def xray_get_status(self, text):
-        pass
-    
+        if text['param']['xray'] == 1:
+            data.exout[user_ioctl.XRAY1_ON] = 0
+            SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
+            fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+            time.sleep(0.1)  
+            
+            data.exout[user_ioctl.XRAY1_READY] = 0
+            SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
+            fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+        elif text['param']['xray'] == 2:
+            data.exout[user_ioctl.XRAY2_ON] = 0
+            SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
+            fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+            time.sleep(0.1)  
+            
+            data.exout[user_ioctl.XRAY2_READY] = 0
+            SET_DATA = _ioctl._IOW(user_ioctl.IOCTL_MAGIC, user_ioctl.SET_GPIO, ctypes.sizeof(data))
+            fcntl.ioctl(self.dev_gpio_handle['dev_gpio'], SET_DATA, data)
+
+    def xray_get_status(self, text, is_http):
+        # JSON 응답 전송
+        # global motor_x, motor_y
+        
+        motor_count_x = 0
+        motor_count_y = 0
+
+        current_time = datetime.datetime.now()
+        timestamp = current_time.strftime('%Y%m%d%H%M%S') + f'{current_time.microsecond // 1000:03d}'
+        # self.get_temp_form_xray(1)
+        time.sleep(0.05)
+        # self.get_temp_form_xray(2)
+        # time.sleep(0.05)
+        # with open('/sys/bus/platform/drivers/pixggen_gpio/equipment/pixxgen_sys/counter1') as count:
+        #     motor_count_x = int(count.readline())
+        # print(f'motor_count_x: {motor_count_x}')
+
+        # with open('/sys/bus/platform/drivers/pixggen_gpio/equipment/pixxgen_sys/counter2') as count:
+        #     motor_count_y = int(count.readline())
+        # print(f'motor_count_y: {motor_count_y}')
+        
+        # if motor_count_x == 0:
+        #     motor_x = remote_x
+        # else:
+        #     motor_x = motor_x + ((-1*count_clock) - (motor_count_x - motor_x))
+
+        # if motor_count_y == 0:
+        #     motor_y = remote_y
+        # else:
+        #     motor_y = motor_count_y
+
+        response = {'status': 'success', 'data': {
+            'command': 'GetStatus',
+            'param': {
+                'device': text['device'],
+                'timestamp': timestamp,
+                'xray1_temp': xray1_uart_response,
+                'xray2_temp': xray2_uart_response,
+                'motor1_is_stop': motor1_is_stop,
+                'motor2_is_stop': motor2_is_stop,
+                'motor3_is_stop': motor3_is_stop,
+                'dc_motor_is_stop': dc_motor_is_stop,
+                'motor_x_position': motor_x,
+                'motor_y_position': motor_y,
+                'stand_position': dc_motor_up
+            }
+        }}
+        self.send_response(response, is_http)
+
+    def system_move(self, text):
+        # JSON 응답 전송
+        # main_window.logging.info(f'pushButton_move_left clicked')
+        global motor1_is_stop, motor2_is_stop, motor3_is_stop, dc_motor_is_stop, remote_x, remote_y, motor_x, motor_y
+        global dc_motor_up, count_clock
+        remote_x =text['param']['x']
+        remote_y =text['param']['y']
+       
+        count_clock = (motor_y - remote_y) * 1
+        
+        if dc_motor_up == False:
+            if remote_y == 0:
+                move_dir = main_window.cc.get_map('st_move_up')
+                loop = move_dir['LOOP']
+                motor2_is_stop = False
+                motor3_is_stop = False
+                for count in range(1, loop+1):
+                    message = {
+                        'position'  : move_dir[f'POSITION{count}'],
+                        'speed'     : int(move_dir[f'SPEED{count}']),
+                        'count'     : int(move_dir[f'COUNT{count}']), 
+                        'timeout'   : int(move_dir[f'TIMEOUT{count}'])   #1분
+                    }
+                print(message)
+                motor_y = 0
+                main_window.command_queue.put(message)
+            elif count_clock < 0:
+                move_dir = main_window.cc.get_map('st_move_down')
+                loop = move_dir['LOOP']
+                motor2_is_stop = False
+                motor3_is_stop = False
+                for count in range(1, loop+1):
+                    message = {
+                        'position'  : move_dir[f'POSITION{count}'],
+                        'speed'     : int(move_dir[f'SPEED{count}']),
+                        'count'     : int(abs(count_clock)), 
+                        'timeout'   : int(move_dir[f'TIMEOUT{count}'])   #1분
+                    }
+                print(message)
+                motor_y = remote_y
+                main_window.command_queue.put(message)
+            else:
+                move_dir = main_window.cc.get_map('st_move_up')
+                loop = move_dir['LOOP']
+                motor2_is_stop = False
+                motor3_is_stop = False
+                for count in range(1, loop+1):
+                    message = {
+                        'position'  : move_dir[f'POSITION{count}'],
+                        'speed'     : int(move_dir[f'SPEED{count}']),
+                        'count'     : int(abs(count_clock)), 
+                        'timeout'   : int(move_dir[f'TIMEOUT{count}'])   #1분
+                    }
+                print(message)
+                motor_y = remote_y
+                main_window.command_queue.put(message)
+            main_window.motor_poistion.set_command_stop(False) #큐를 시작할 수 있는 조건 FALSE
+        
+        count_clock = (motor_x - remote_x) * 1
+        
+        if remote_x == 0:
+            move_dir = main_window.cc.get_map('st_move_left')
+            loop = move_dir['LOOP']
+            motor1_is_stop = False
+            for count in range(1, loop+1):
+                message = {
+                    'position'  : move_dir[f'POSITION{count}'],
+                    'speed'     : int(move_dir[f'SPEED{count}']),
+                    'count'     : int(move_dir[f'COUNT{count}']), 
+                    'timeout'   : int(move_dir[f'TIMEOUT{count}'])   #1분
+                }
+            print(message)
+            motor_x = 0
+            main_window.command_queue.put(message)
+        elif count_clock < 0:   
+            move_dir = main_window.cc.get_map('st_move_right')
+            loop = move_dir['LOOP']
+            motor1_is_stop = False
+            for count in range(1, loop+1):
+                message = {
+                    'position'  : move_dir[f'POSITION{count}'],
+                    'speed'     : int(move_dir[f'SPEED{count}']),
+                    'count'     : int(abs(count_clock)), 
+                    'timeout'   : int(move_dir[f'TIMEOUT{count}'])   #1분
+                }
+            print(message)
+            motor_x = remote_x
+            main_window.command_queue.put(message)
+        else:
+            move_dir = main_window.cc.get_map('st_move_left')
+            loop = move_dir['LOOP']
+            motor1_is_stop = False
+            for count in range(1, loop+1):
+                message = {
+                    'position'  : move_dir[f'POSITION{count}'],
+                    'speed'     : int(move_dir[f'SPEED{count}']),
+                    'count'     : int(abs(count_clock)), 
+                    'timeout'   : int(move_dir[f'TIMEOUT{count}'])   #1분
+                }
+            print(message)
+            motor_x = remote_x
+            main_window.command_queue.put(message)
+        main_window.motor_poistion.set_command_stop(False) #큐를 시작할 수 있는 조건 FALSE
+
+    def detector_stand(self, text):
+        # JSON 응답 전송
+        # main_window.logging.info(f'pushButton_move_left clicked')
+        global motor1_is_stop, motor2_is_stop, motor3_is_stop, dc_motor_is_stop, remote_x, remote_y, motor_x, motor_y
+        global dc_motor_up
+
+        move_dir = main_window.cc.get_map('st2_move_down')
+        loop = move_dir['LOOP']
+        motor2_is_stop = False
+        for count in range(1, loop+1):
+            message = {
+                'position'  : move_dir[f'POSITION{count}'],
+                'speed'     : int(move_dir[f'SPEED{count}']),
+                'count'     : int(move_dir[f'COUNT{count}']), 
+                'timeout'   : int(move_dir[f'TIMEOUT{count}'])   #1분
+            }
+        print(message)
+        main_window.command_queue.put(message)
+        main_window.motor_poistion.set_command_stop(False) #큐를 시작할 수 있는 조건 FALSE
+
+        if text['param']['up'] == 1:
+            move_dir = main_window.cc.get_map('dc_motor_up')
+            loop = move_dir['LOOP']
+            dc_motor_is_stop = False
+            dc_motor_up = True
+            for count in range(1, loop+1):
+                message = {
+                    'position'  : move_dir[f'POSITION{count}'],
+                    'speed'     : int(move_dir[f'SPEED{count}']),
+                    'count'     : int(move_dir[f'COUNT{count}']), 
+                    'timeout'   : int(move_dir[f'TIMEOUT{count}'])   #1분
+                }
+            print(message)
+            main_window.command_queue.put(message)
+        else:
+            move_dir = main_window.cc.get_map('dc_motor_down')
+            loop = move_dir['LOOP']
+            dc_motor_is_stop = False
+            dc_motor_up = False
+            for count in range(1, loop+1):
+                message = {
+                    'position'  : move_dir[f'POSITION{count}'],
+                    'speed'     : int(move_dir[f'SPEED{count}']),
+                    'count'     : int(move_dir[f'COUNT{count}']), 
+                    'timeout'   : int(move_dir[f'TIMEOUT{count}'])   #1분
+                }
+            print(message)
+            main_window.command_queue.put(message)
+        main_window.motor_poistion.set_command_stop(False) #큐를 시작할 수 있는 조건 FALSE
+
     def on_xray_power(self, text):
         if text['onoff'] == 'on':
             print(f'on_xray_power{text["sel"]}')
@@ -347,19 +635,40 @@ class JsonTCPHandler(socketserver.BaseRequestHandler):
     
     def simple_timer(self, seconds):
         """지정된 시간 후에 한 번만 실행되는 타이머
-        
         Args:
             seconds (int): 타이머 시간 (초)
         """
         def timer_job():
             time.sleep(seconds)
             print(f"{seconds}초 타이머 완료!")
-            self.xray_stop({"command": "StopXRAY"})
+            self.xray_stop({"command": "StopXRAY",
+                            "param":{
+                                "xray": 1
+                            }
+                            })
+            self.xray_stop({"command": "StopXRAY",
+                            "param":{
+                                "xray": 2
+                            }
+                            })
             
         timer_thread = threading.Thread(target=timer_job)
         timer_thread.daemon = True
         timer_thread.start()
 
 
+    def get_temp_form_xray(self, select_power):
+        xray_temp = "[XTMP]"
 
+        if select_power == 1:
+            GPIO.output(20, GPIO.HIGH)
+            time.sleep(0.05)
+            self.uart_power1.send_serial(xray_temp, None)
+        else:
+            GPIO.output(20, GPIO.LOW)
+            time.sleep(0.05)
+            self.uart_power2.send_serial(xray_temp, None)
+        time.sleep(0.1)
+        GPIO.output(20, GPIO.HIGH)
+        time.sleep(0.01)
         

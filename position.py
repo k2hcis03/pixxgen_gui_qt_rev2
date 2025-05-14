@@ -7,15 +7,17 @@ import queue
 import fcntl
 import user_ioctl
 import ctypes
-
+import tcpserver
 TIME_OUT = 1
 SENSOR_DETECT = 2
 COUNT_REACH = 3
 FORCE_STOP = 4
+SENSOR_NOT_READY = 5
+
 
 class MotorPosition(threading.Thread):
     def __init__(self, parent, work_queue, st_motor, gpio_i2c_parsing_data,
-                 _lock, logging, uart_power1, uart_power2, dev_gpio_handle) -> None:
+                 _lock, logging, uart_power1, uart_power2, dev_gpio_handle, dc_motor) -> None:
         threading.Thread.__init__(self)
         self.command_queue = work_queue
         self.st_motor = st_motor
@@ -30,7 +32,7 @@ class MotorPosition(threading.Thread):
         self.uart_power1 = uart_power1
         self.uart_power2 = uart_power2
         self.dev_gpio_handle = dev_gpio_handle
-        
+        self.dc_motor = dc_motor
     def run(self):
         while True:
             message = self.command_queue.get()
@@ -41,18 +43,22 @@ class MotorPosition(threading.Thread):
                     
                     if completed == SENSOR_DETECT:
                         self.logging.info('st_move_left_position completed by sensor')
+                        tcpserver.motor1_is_stop = True
                         self.send_command = False       # 동작 완료
                         break
                     elif completed == COUNT_REACH:
                         self.logging.info('st_move_left_position completed by counter')
+                        tcpserver.motor1_is_stop = True
                         self.send_command = False       # 동작 완료
                         break
                     elif completed == TIME_OUT:
                         self.logging.info('st_move_left_position time out!')
+                        tcpserver.motor1_is_stop = True
                         self.send_command = False       # 동작 완료
                         break
                     elif completed == FORCE_STOP:
                         self.logging.info('st_move_left_position stopped by force')
+                        tcpserver.motor1_is_stop = True
                         self.send_command = False       # 동작 완료
                         break
                     time.sleep(0.1)
@@ -61,18 +67,22 @@ class MotorPosition(threading.Thread):
                     
                     if completed == SENSOR_DETECT:
                         self.logging.info('st_move_right_position completed by sensor')
+                        tcpserver.motor1_is_stop = True
                         self.send_command = False       # 동작 완료
                         break
                     elif completed == COUNT_REACH:
                         self.logging.info('st_move_right_position completed by counter')
+                        tcpserver.motor1_is_stop = True
                         self.send_command = False       # 동작 완료
                         break
                     elif completed == TIME_OUT:
                         self.logging.info('st_move_right_position time out!')
+                        tcpserver.motor1_is_stop = True
                         self.send_command = False       # 동작 완료
                         break
                     elif completed == FORCE_STOP:
                         self.logging.info('st_move_right_position stopped by force')
+                        tcpserver.motor1_is_stop = True
                         self.send_command = False       # 동작 완료
                         break
                     time.sleep(0.1)  
@@ -81,18 +91,50 @@ class MotorPosition(threading.Thread):
                       
                     if completed == SENSOR_DETECT:
                         self.logging.info('st_move_up_position completed by sensor')
+                        tcpserver.motor2_is_stop = True
+                        tcpserver.motor3_is_stop = True
                         self.send_command = False       # 동작 완료
                         break
                     elif completed == COUNT_REACH:
                         self.logging.info('st_move_up_position completed by counter')
+                        tcpserver.motor2_is_stop = True
+                        tcpserver.motor3_is_stop = True
                         self.send_command = False       # 동작 완료
                         break
                     elif completed == TIME_OUT:
                         self.logging.info('st_move_up_position time out!')
+                        tcpserver.motor2_is_stop = True
+                        tcpserver.motor3_is_stop = True
                         self.send_command = False       # 동작 완료
                         break
                     elif completed == FORCE_STOP:
                         self.logging.info('st_move_up_position stopped by force')
+                        tcpserver.motor2_is_stop = True
+                        tcpserver.motor3_is_stop = True
+                        self.send_command = False       # 동작 완료
+                        break
+                    time.sleep(0.1)
+                elif message['position'] == 'st2_up': 
+                    completed = self.st2_move_up_position(message)
+                      
+                    if completed == SENSOR_DETECT:
+                        self.logging.info('st_move_up_position completed by sensor')
+                        tcpserver.motor2_is_stop = True
+                        self.send_command = False       # 동작 완료
+                        break
+                    elif completed == COUNT_REACH:
+                        self.logging.info('st_move_up_position completed by counter')
+                        tcpserver.motor2_is_stop = True
+                        self.send_command = False       # 동작 완료
+                        break
+                    elif completed == TIME_OUT:
+                        self.logging.info('st_move_up_position time out!')
+                        tcpserver.motor2_is_stop = True
+                        self.send_command = False       # 동작 완료
+                        break
+                    elif completed == FORCE_STOP:
+                        self.logging.info('st_move_up_position stopped by force')
+                        tcpserver.motor2_is_stop = True
                         self.send_command = False       # 동작 완료
                         break
                     time.sleep(0.1)
@@ -101,18 +143,50 @@ class MotorPosition(threading.Thread):
                     
                     if completed == SENSOR_DETECT:
                         self.logging.info('st_move_down_position completed by sensor')
+                        tcpserver.motor2_is_stop = True
+                        tcpserver.motor3_is_stop = True
                         self.send_command = False       # 동작 완료
                         break
                     elif completed == COUNT_REACH:
                         self.logging.info('st_move_down_position completed by counter')
+                        tcpserver.motor2_is_stop = True
+                        tcpserver.motor3_is_stop = True
                         self.send_command = False       # 동작 완료
                         break
                     elif completed == TIME_OUT:
                         self.logging.info('st_move_down_position time out!')
+                        tcpserver.motor2_is_stop = True
+                        tcpserver.motor3_is_stop = True
                         self.send_command = False       # 동작 완료
                         break
                     elif completed == FORCE_STOP:
                         self.logging.info('st_move_down_position stopped by force')
+                        tcpserver.motor2_is_stop = True
+                        tcpserver.motor3_is_stop = True
+                        self.send_command = False       # 동작 완료
+                        break    
+                    time.sleep(0.1)
+                elif message['position'] == 'st2_down': 
+                    completed = self.st2_move_down_position(message)
+                    
+                    if completed == SENSOR_DETECT:
+                        self.logging.info('st_move_down_position completed by sensor')
+                        tcpserver.motor2_is_stop = True
+                        self.send_command = False       # 동작 완료
+                        break
+                    elif completed == COUNT_REACH:
+                        self.logging.info('st_move_down_position completed by counter')
+                        tcpserver.motor2_is_stop = True
+                        self.send_command = False       # 동작 완료
+                        break
+                    elif completed == TIME_OUT:
+                        self.logging.info('st_move_down_position time out!')
+                        tcpserver.motor2_is_stop = True
+                        self.send_command = False       # 동작 완료
+                        break
+                    elif completed == FORCE_STOP:
+                        self.logging.info('st_move_down_position stopped by force')
+                        tcpserver.motor2_is_stop = True
                         self.send_command = False       # 동작 완료
                         break    
                     time.sleep(0.1)
@@ -121,18 +195,22 @@ class MotorPosition(threading.Thread):
                     
                     if completed == SENSOR_DETECT:
                         self.logging.info('dc_move_down_position completed by sensor')
+                        tcpserver.dc_motor_is_stop = True
                         self.send_command = False       # 동작 완료
                         break
                     elif completed == COUNT_REACH:
                         self.logging.info('dc_move_down_position completed by counter')
+                        tcpserver.dc_motor_is_stop = True
                         self.send_command = False       # 동작 완료
                         break
                     elif completed == TIME_OUT:
                         self.logging.info('dc_move_down_position time out!')
+                        tcpserver.dc_motor_is_stop = True
                         self.send_command = False       # 동작 완료
                         break
                     elif completed == FORCE_STOP:
                         self.logging.info('dc_move_down_position stopped by force')
+                        tcpserver.dc_motor_is_stop = True
                         self.send_command = False       # 동작 완료
                         break
                     time.sleep(0.1)
@@ -141,18 +219,22 @@ class MotorPosition(threading.Thread):
                     
                     if completed == SENSOR_DETECT:
                         self.logging.info('dc_move_up_position completed by sensor')
+                        tcpserver.dc_motor_is_stop = True
                         self.send_command = False       # 동작 완료
                         break
                     elif completed == COUNT_REACH:
                         self.logging.info('dc_move_up_position completed by counter')
+                        tcpserver.dc_motor_is_stop = True
                         self.send_command = False       # 동작 완료
                         break
                     elif completed == TIME_OUT:
                         self.logging.info('dc_move_up_position time out!')
+                        tcpserver.dc_motor_is_stop = True
                         self.send_command = False       # 동작 완료
                         break
                     elif completed == FORCE_STOP:
                         self.logging.info('dc_move_up_position stopped by force')
+                        tcpserver.dc_motor_is_stop = True
                         self.send_command = False       # 동작 완료
                         break
                     time.sleep(0.1)
@@ -217,7 +299,7 @@ class MotorPosition(threading.Thread):
         motor2_count = -1
         motor3_count = -1
         
-        if self.gpio_i2c_parsing_data['step2_enc1'][2] and self.gpio_i2c_parsing_data['step3_enc1'][2]:
+        if self.gpio_i2c_parsing_data['step2_enc1'][2] and self.gpio_i2c_parsing_data['step3_enc1'][2] or self.gpio_i2c_parsing_data['dc1_enc2'][2]:
             return SENSOR_DETECT
         
         if not self.send_command:
@@ -244,11 +326,61 @@ class MotorPosition(threading.Thread):
             return COUNT_REACH
         return 0
     
+    def st2_move_up_position(self, message) -> int:    #1을 리턴하면 위치 도착 0을 리턴하면 이동 중. 스텝 모터 2만 움직임임
+        motor2_count = -1
+
+        if self.gpio_i2c_parsing_data['step2_enc1'][2] or self.gpio_i2c_parsing_data['dc1_enc2'][2]:
+            return SENSOR_DETECT
+        
+        if not self.send_command :
+            self.timeout = time.time()
+            self.st_motor.st_motor_enable(2, True)
+            self.st_motor.st_motor_start(2, True, message['speed'], message['count'])
+            self.send_command = True
+        
+        if time.time() - self.timeout >= message['timeout']:
+            return TIME_OUT
+        
+        if self.not_doing_work:
+            return FORCE_STOP
+        
+        with open('/sys/bus/platform/drivers/pixggen_gpio/equipment/pixxgen_sys/counter2') as count:
+            motor2_count = int(count.readline())
+
+        if motor2_count == 0:
+            return COUNT_REACH
+        return 0
+    
+    def st2_move_down_position(self, message) -> int:    #1을 리턴하면 위치 도착 0을 리턴하면 이동 중. 스텝 모터 2만 움직임임
+        motor2_count = -1
+        
+        if self.gpio_i2c_parsing_data['step2_enc3'][2] or self.gpio_i2c_parsing_data['dc1_enc2'][2]:  # 모터 3번이 2번보다 길이가 짧으므로 OR조건으로 설정
+            return SENSOR_DETECT
+        
+        if not self.send_command:
+            self.timeout = time.time()
+            self.st_motor.st_motor_enable(2, True)
+            self.st_motor.st_motor_start(2, True, message['speed'], -1*message['count'])
+            self.send_command = True
+        
+        if time.time() - self.timeout >= message['timeout']:
+            return TIME_OUT
+        
+        if self.not_doing_work:
+            return FORCE_STOP
+        
+        with open('/sys/bus/platform/drivers/pixggen_gpio/equipment/pixxgen_sys/counter2') as count:
+            motor2_count = int(count.readline())
+
+        if motor2_count == 0:      # 모터 3번이 2번보다 길이가 짧으므로 OR조건으로 설정
+            return COUNT_REACH
+        return 0
+
     def st_move_down_position(self, message) -> int:    #1을 리턴하면 위치 도착 0을 리턴하면 이동 중.
         motor2_count = -1
         motor3_count = -1
         
-        if self.gpio_i2c_parsing_data['step2_enc2'][2] or self.gpio_i2c_parsing_data['step3_enc2'][2]:  # 모터 3번이 2번보다 길이가 짧으므로 OR조건으로 설정
+        if self.gpio_i2c_parsing_data['step2_enc2'][2] or self.gpio_i2c_parsing_data['step3_enc2'][2] or self.gpio_i2c_parsing_data['dc1_enc2'][2]:  # 모터 3번이 2번보다 길이가 짧으므로 OR조건으로 설정
             return SENSOR_DETECT
         
         if not self.send_command:
@@ -446,4 +578,5 @@ class MotorPosition(threading.Thread):
     def command_completed(self):
         return self.send_command                
             
-        
+    def get_stand_status(self):
+        return True if self.gpio_i2c_parsing_data['dc1_enc2'][2] else False

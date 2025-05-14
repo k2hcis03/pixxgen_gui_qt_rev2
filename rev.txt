@@ -1,2 +1,11 @@
+STEP1 : 장축
+STEP2 : DETECTOR
+STEP3 : XRAY-POWER
+
 1) 픽젠 GUI연동 소켓 추가
 2) mode 연속 기능 추가
+
+20250501
+1) 인증용 기능 추가
+2) 리모트 명령어 추가 중
+
